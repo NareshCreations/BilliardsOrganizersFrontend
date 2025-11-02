@@ -1,0 +1,470 @@
+// Bar Dashboard Container
+.barDashboardContainer {
+  min-height: calc(100vh - 140px);
+  margin-top: 80px;
+  background: linear-gradient(135deg, #0f0f23 0%, #1a1a3a 100%);
+  color: #fff;
+}
+
+.barDashboardContent {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0.5rem 1rem;
+}
+
+// Back Button
+.backButton {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-bottom: 2rem;
+  transition: all 0.3s ease;
+
+  &:hover {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.5);
+    transform: translateY(-2px);
+  }
+}
+
+// Bar Header
+.barHeader {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  background: rgba(15, 15, 35, 0.9);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.barImage {
+  position: relative;
+  height: 300px;
+  overflow: hidden;
+}
+
+.barImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.barInfo {
+  padding: 2rem;
+}
+
+.barName {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin: 0 0 1rem 0;
+  background: linear-gradient(135deg, #3b82f6 0%, #9333ea 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.barRating {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.star {
+  color: #fbbf24;
+  font-size: 1.5rem;
+}
+
+.starHalf {
+  color: #fbbf24;
+  font-size: 1.5rem;
+  opacity: 0.7;
+}
+
+.starEmpty {
+  color: #6b7280;
+  font-size: 1.5rem;
+}
+
+.ratingText {
+  color: #cbd5e1;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.barLocation {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #94a3b8;
+  margin-bottom: 1.5rem;
+  font-size: 1.1rem;
+}
+
+.locationIcon {
+  font-size: 1.2rem;
+}
+
+.barDescription {
+  color: #cbd5e1;
+  line-height: 1.6;
+  margin-bottom: 2rem;
+  font-size: 1.1rem;
+}
+
+.barDetails {
+  margin-bottom: 2rem;
+}
+
+.detailRow {
+  display: flex;
+  margin-bottom: 0.75rem;
+}
+
+.detailLabel {
+  font-weight: 600;
+  color: #94a3b8;
+  min-width: 120px;
+  margin-right: 1rem;
+}
+
+.detailValue {
+  color: #fff;
+}
+
+.facilities {
+  h3 {
+    color: #fff;
+    margin-bottom: 1rem;
+    font-size: 1.2rem;
+  }
+}
+
+.facilitiesList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.facility {
+  background: rgba(59, 130, 246, 0.1);
+  color: #3b82f6;
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+// Tab Navigation
+.tabNavigation {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  background: rgba(15, 15, 35, 0.8);
+  border-radius: 12px;
+  padding: 0.5rem;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+}
+
+.tabButton {
+  flex: 1;
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &.active {
+    background: linear-gradient(135deg, #3b82f6 0%, #9333ea 100%);
+    color: white;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  }
+
+  &:hover:not(.active) {
+    background: rgba(59, 130, 246, 0.1);
+    color: #3b82f6;
+  }
+}
+
+// Matches Section
+.matchesSection {
+  // Container for match cards
+}
+
+.matchesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 2rem;
+}
+
+.matchCard {
+  background: rgba(15, 15, 35, 0.9);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-4px);
+    border-color: rgba(59, 130, 246, 0.4);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  }
+}
+
+.matchHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1.5rem 1.5rem 0;
+}
+
+.matchTitle {
+  flex: 1;
+}
+
+.matchTitle h3 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin: 0 0 0.5rem 0;
+  color: #fff;
+}
+
+.gameType {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: white;
+}
+
+.statusBadge {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.matchDetails {
+  padding: 1.5rem;
+}
+
+.detailRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.detailLabel {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.detailValue {
+  color: #fff;
+  font-weight: 600;
+}
+
+.prizeValue {
+  color: #22c55e;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.entryFee {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+.skillLevel {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.matchActions {
+  padding: 1rem 1.5rem 1.5rem;
+  border-top: 1px solid rgba(59, 130, 246, 0.1);
+}
+
+.joinButton {
+  width: 100%;
+  background: linear-gradient(135deg, #3b82f6 0%, #9333ea 100%);
+  color: white;
+  border: none;
+  padding: 1rem 2rem;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+  }
+
+  &:disabled {
+    background: #6b7280;
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+// History Section
+.historySection {
+  // Container for history cards
+}
+
+.historyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1.5rem;
+}
+
+.historyCard {
+  background: rgba(15, 15, 35, 0.9);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: 16px;
+  padding: 1.5rem;
+  transition: all 0.3s ease;
+
+  &:hover {
+    border-color: rgba(59, 130, 246, 0.4);
+    transform: translateY(-2px);
+  }
+}
+
+.historyHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.historyHeader h3 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0;
+  color: #fff;
+}
+
+.historyDetails {
+  // Container for history details
+}
+
+.historyRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.historyLabel {
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.historyValue {
+  color: #fff;
+  font-weight: 600;
+}
+
+.prizeWon {
+  color: #22c55e;
+  font-weight: 700;
+}
+
+.completedStatus {
+  color: #6b7280;
+  font-weight: 700;
+  font-size: 0.875rem;
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .barDashboardContent {
+    padding: 0.5rem;
+  }
+
+  .barHeader {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .barImage {
+    height: 200px;
+  }
+
+  .barInfo {
+    padding: 1.5rem;
+  }
+
+  .barName {
+    font-size: 2rem;
+  }
+
+  .tabNavigation {
+    flex-direction: column;
+  }
+
+  .matchesGrid,
+  .historyGrid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .matchHeader {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+
+  .facilitiesList {
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .barName {
+    font-size: 1.5rem;
+  }
+
+  .barInfo {
+    padding: 1rem;
+  }
+
+  .matchDetails {
+    padding: 1rem;
+  }
+
+  .matchActions {
+    padding: 1rem;
+  }
+
+  .historyCard {
+    padding: 1rem;
+  }
+}

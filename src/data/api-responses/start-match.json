@@ -1,0 +1,40 @@
+{
+  "success": true,
+  "message": "Match started successfully",
+  "data": {
+    "matchId": 1,
+    "status": "live",
+    "startTime": "2024-01-15T10:30:00Z",
+    "players": {
+      "player1": {
+        "id": 1,
+        "name": "Rajesh Kumar",
+        "rank": 1,
+        "rating": 1850,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert",
+        "matchesPlayed": 45,
+        "matchesWon": 38,
+        "winRate": 84.4
+      },
+      "player2": {
+        "id": 2,
+        "name": "Suresh Rao",
+        "rank": 7,
+        "rating": 1720,
+        "profilePic": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Advanced",
+        "matchesPlayed": 32,
+        "matchesWon": 24,
+        "winRate": 75.0
+      }
+    },
+    "liveStats": {
+      "currentScore": "0-0",
+      "currentBreak": 0,
+      "timeElapsed": "0:00",
+      "shotsPlayed": 0
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}

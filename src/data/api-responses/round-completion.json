@@ -1,0 +1,182 @@
+{
+  "success": true,
+  "message": "Round completed successfully",
+  "data": {
+    "completedRound": 1,
+    "nextRound": 2,
+    "roundWinners": [
+      {
+        "id": 1,
+        "name": "Rajesh Kumar",
+        "rank": 1,
+        "rating": 1865,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert",
+        "matchesPlayed": 46,
+        "matchesWon": 39,
+        "winRate": 84.8
+      },
+      {
+        "id": 3,
+        "name": "Neha Kapoor",
+        "rank": 3,
+        "rating": 1795,
+        "profilePic": "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert",
+        "matchesPlayed": 29,
+        "matchesWon": 23,
+        "winRate": 79.3
+      },
+      {
+        "id": 6,
+        "name": "Vikram Singh",
+        "rank": 2,
+        "rating": 1835,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert",
+        "matchesPlayed": 43,
+        "matchesWon": 36,
+        "winRate": 83.7
+      },
+      {
+        "id": 8,
+        "name": "Shruti Jain",
+        "rank": 11,
+        "rating": 1665,
+        "profilePic": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Advanced",
+        "matchesPlayed": 31,
+        "matchesWon": 22,
+        "winRate": 71.0
+      },
+      {
+        "id": 10,
+        "name": "Rohit Verma",
+        "rank": 9,
+        "rating": 1695,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Advanced",
+        "matchesPlayed": 39,
+        "matchesWon": 29,
+        "winRate": 74.4
+      }
+    ],
+    "nextRoundMatches": [
+      {
+        "id": 21,
+        "round": 2,
+        "player1": {
+          "id": 1,
+          "name": "Rajesh Kumar",
+          "rank": 1,
+          "rating": 1865,
+          "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+          "skillLevel": "Expert"
+        },
+        "player2": {
+          "id": 3,
+          "name": "Neha Kapoor",
+          "rank": 3,
+          "rating": 1795,
+          "profilePic": "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+          "skillLevel": "Expert"
+        },
+        "status": "pending",
+        "startTime": null,
+        "endTime": null,
+        "winner": null,
+        "score": null
+      },
+      {
+        "id": 22,
+        "round": 2,
+        "player1": {
+          "id": 6,
+          "name": "Vikram Singh",
+          "rank": 2,
+          "rating": 1835,
+          "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+          "skillLevel": "Expert"
+        },
+        "player2": {
+          "id": 8,
+          "name": "Shruti Jain",
+          "rank": 11,
+          "rating": 1665,
+          "profilePic": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
+          "skillLevel": "Advanced"
+        },
+        "status": "pending",
+        "startTime": null,
+        "endTime": null,
+        "winner": null,
+        "score": null
+      }
+    ],
+    "nextRoundWinners": [
+      {
+        "id": 1,
+        "name": "Rajesh Kumar",
+        "rank": 1,
+        "rating": 1865,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert",
+        "matchesPlayed": 46,
+        "matchesWon": 39,
+        "winRate": 84.8
+      },
+      {
+        "id": 3,
+        "name": "Neha Kapoor",
+        "rank": 3,
+        "rating": 1795,
+        "profilePic": "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert",
+        "matchesPlayed": 29,
+        "matchesWon": 23,
+        "winRate": 79.3
+      },
+      {
+        "id": 6,
+        "name": "Vikram Singh",
+        "rank": 2,
+        "rating": 1835,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert",
+        "matchesPlayed": 43,
+        "matchesWon": 36,
+        "winRate": 83.7
+      },
+      {
+        "id": 8,
+        "name": "Shruti Jain",
+        "rank": 11,
+        "rating": 1665,
+        "profilePic": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Advanced",
+        "matchesPlayed": 31,
+        "matchesWon": 22,
+        "winRate": 71.0
+      },
+      {
+        "id": 10,
+        "name": "Rohit Verma",
+        "rank": 9,
+        "rating": 1695,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Advanced",
+        "matchesPlayed": 39,
+        "matchesWon": 29,
+        "winRate": 74.4
+      }
+    ],
+    "tournamentStats": {
+      "totalMatches": 39,
+      "completedMatches": 5,
+      "remainingMatches": 34,
+      "currentRound": 2,
+      "totalRounds": 6
+    }
+  },
+  "timestamp": "2024-01-15T11:00:00Z"
+}

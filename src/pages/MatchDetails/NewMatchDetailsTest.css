@@ -1,0 +1,50 @@
+.tournament-container {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+}
+
+.tabs {
+  margin: 12px 0;
+  display: flex;
+  gap: 10px;
+}
+
+.tab-btn {
+  padding: 8px 16px;
+  border: none;
+  background: #e5e7eb;
+  cursor: pointer;
+  border-radius: 6px;
+  font-weight: 600;
+}
+
+.tab-btn.active {
+  background: #2563eb;
+  color: #fff;
+}
+
+.match-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 14px;
+}
+
+.match-table th, .match-table td {
+  padding: 10px;
+  border: 1px solid #ddd;
+  text-align: left;
+}
+
+.match-table th {
+  background: #f3f4f6;
+}
+
+.winner-cell {
+  font-weight: 700;
+  color: #16a34a;
+}
+
+.trophy-icon {
+  color: gold;
+  margin-right: 4px;
+}

@@ -1,0 +1,52 @@
+{
+  "success": true,
+  "message": "Tournament status updated successfully",
+  "data": {
+    "tournamentId": "tour_001",
+    "status": "running",
+    "currentRound": 1,
+    "activeMatch": {
+      "id": 1,
+      "round": 1,
+      "player1": {
+        "id": 1,
+        "name": "Rajesh Kumar",
+        "rank": 1,
+        "rating": 1850,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert"
+      },
+      "player2": {
+        "id": 2,
+        "name": "Suresh Rao",
+        "rank": 7,
+        "rating": 1720,
+        "profilePic": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Advanced"
+      },
+      "status": "live",
+      "startTime": "2024-01-15T10:30:00Z",
+      "liveStats": {
+        "currentScore": "5-3",
+        "currentBreak": 2,
+        "timeElapsed": "15:30",
+        "shotsPlayed": 28
+      }
+    },
+    "matchStatuses": {
+      "live": [1],
+      "pending": [2, 3, 4, 5],
+      "completed": [],
+      "closed": []
+    },
+    "roundProgress": {
+      "round1": {
+        "totalMatches": 5,
+        "completedMatches": 0,
+        "remainingMatches": 5,
+        "progressPercentage": 0
+      }
+    }
+  },
+  "timestamp": "2024-01-15T10:45:30Z"
+}

@@ -1,0 +1,84 @@
+{
+  "success": true,
+  "message": "Winners shuffled successfully",
+  "data": {
+    "roundNumber": 2,
+    "shuffledWinners": [
+      {
+        "id": 6,
+        "name": "Vikram Singh",
+        "rank": 2,
+        "rating": 1835,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert",
+        "matchesPlayed": 43,
+        "matchesWon": 36,
+        "winRate": 83.7
+      },
+      {
+        "id": 1,
+        "name": "Rajesh Kumar",
+        "rank": 1,
+        "rating": 1865,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert",
+        "matchesPlayed": 46,
+        "matchesWon": 39,
+        "winRate": 84.8
+      },
+      {
+        "id": 10,
+        "name": "Rohit Verma",
+        "rank": 9,
+        "rating": 1695,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Advanced",
+        "matchesPlayed": 39,
+        "matchesWon": 29,
+        "winRate": 74.4
+      }
+    ],
+    "newMatches": [
+      {
+        "id": 21,
+        "round": 2,
+        "player1": {
+          "id": 6,
+          "name": "Vikram Singh",
+          "rank": 2,
+          "rating": 1835,
+          "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+          "skillLevel": "Expert"
+        },
+        "player2": {
+          "id": 1,
+          "name": "Rajesh Kumar",
+          "rank": 1,
+          "rating": 1865,
+          "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+          "skillLevel": "Expert"
+        },
+        "status": "pending",
+        "startTime": null,
+        "endTime": null,
+        "winner": null,
+        "score": null
+      }
+    ],
+    "oddPlayer": {
+      "id": 10,
+      "name": "Rohit Verma",
+      "rank": 9,
+      "rating": 1695,
+      "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+      "skillLevel": "Advanced",
+      "matchesPlayed": 39,
+      "matchesWon": 29,
+      "winRate": 74.4,
+      "status": "waiting",
+      "reason": "odd_player",
+      "fromRound": 2
+    }
+  },
+  "timestamp": "2024-01-15T11:05:00Z"
+}

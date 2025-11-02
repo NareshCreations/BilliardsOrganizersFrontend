@@ -1,0 +1,20 @@
+{
+  "success": true,
+  "message": "Tournament paused successfully",
+  "data": {
+    "tournamentId": "tour_001",
+    "status": "paused",
+    "currentRound": 1,
+    "pausedAt": "2024-01-15T10:45:30Z",
+    "activeMatch": null,
+    "matchStatuses": {
+      "live": [],
+      "pending": [1, 2, 3, 4, 5],
+      "completed": [],
+      "closed": []
+    },
+    "pauseReason": "Tournament organizer request",
+    "resumeTime": null
+  },
+  "timestamp": "2024-01-15T10:45:30Z"
+}

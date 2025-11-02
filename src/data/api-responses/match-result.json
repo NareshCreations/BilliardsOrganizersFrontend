@@ -1,0 +1,52 @@
+{
+  "success": true,
+  "message": "Match result recorded successfully",
+  "data": {
+    "matchId": 1,
+    "winner": {
+      "id": 1,
+      "name": "Rajesh Kumar",
+      "rank": 1,
+      "rating": 1850,
+      "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+      "skillLevel": "Expert",
+      "matchesPlayed": 46,
+      "matchesWon": 39,
+      "winRate": 84.8
+    },
+    "loser": {
+      "id": 2,
+      "name": "Suresh Rao",
+      "rank": 7,
+      "rating": 1715,
+      "profilePic": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+      "skillLevel": "Advanced",
+      "matchesPlayed": 33,
+      "matchesWon": 24,
+      "winRate": 72.7
+    },
+    "matchDetails": {
+      "status": "completed",
+      "startTime": "2024-01-15T10:30:00Z",
+      "endTime": "2024-01-15T10:55:00Z",
+      "duration": "25 minutes",
+      "finalScore": "9-7",
+      "totalShots": 45,
+      "winnerBreak": 3,
+      "loserBreak": 2
+    },
+    "ratingChanges": {
+      "winner": {
+        "previousRating": 1850,
+        "newRating": 1865,
+        "change": 15
+      },
+      "loser": {
+        "previousRating": 1720,
+        "newRating": 1705,
+        "change": -15
+      }
+    }
+  },
+  "timestamp": "2024-01-15T10:55:00Z"
+}
