@@ -13,4 +13,22 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  css: {
+    preprocessorOptions: {
+      scss: {
+        silenceDeprecations: ['legacy-js-api'], // ← Add this
+      },
+    },
+  },
+  build: {
+    chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          lucide: ['lucide-react'],
+        },
+      },
+    },
+  },
 })

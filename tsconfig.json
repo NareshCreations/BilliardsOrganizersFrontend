@@ -19,5 +19,13 @@
     }
   },
   "include": ["src", "src/types"],
+  "exclude": [
+    "src/components/pages/Matches - Today - V1.tsx",
+    "src/components/pages/Matches copy.tsx",
+    "src/components/pages/Matches.tsx.backup",
+    "**/*.backup",
+    "**/* copy.*",
+    "**/* - *"
+  ],
   "references": [{ "path": "./tsconfig.node.json" }]
 }

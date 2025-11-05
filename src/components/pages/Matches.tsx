@@ -1214,7 +1214,7 @@ selectedRoundDisplayName: '',
       console.log('🌐 API Base URL:', import.meta.env.VITE_API_BASE_URL || 'http://localhost:3005/api/v1');
       
       // Verify user is authenticated before making the call
-      const authService = (await import('../../services/authService')).default;
+      //const authService = (await import('../../services/authService')).default;
       const token = authService.getAccessToken();
       
       if (!token) {
@@ -1388,7 +1388,7 @@ selectedRoundDisplayName: '',
       console.log('🔐 Checking for authentication token...');
       
       // Verify user is authenticated before making the call
-      const authService = (await import('../../services/authService')).default;
+      //const authService = (await import('../../services/authService')).default;
       const token = authService.getAccessToken();
       
       if (!token) {

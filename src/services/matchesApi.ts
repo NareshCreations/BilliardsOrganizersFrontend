@@ -1,5 +1,6 @@
 // API service for matches data
 import { makeAuthenticatedRequest } from './api';
+import authService from './authService';
 export interface Match {
   id: number;
   name: string;
@@ -362,7 +363,7 @@ class MatchesApiService {
       console.log('🔐 Request method: POST');
       
       // Get token from authService
-      const authService = (await import('./authService')).default;
+      //const authService = (await import('./authService')).default;
       const token = authService.getAccessToken();
       
       if (!token) {
@@ -499,7 +500,7 @@ class MatchesApiService {
       if (response.status === 401) {
         console.log('❌ Unauthorized request (401), token expired or invalid');
         console.log('🔐 Logging out user and redirecting to login page...');
-        const authService = (await import('./authService')).default;
+        //const authService = (await import('./authService')).default;
         authService.logout();
         // Redirect to login page
         window.location.href = '/login';
