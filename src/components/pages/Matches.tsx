@@ -1907,7 +1907,9 @@ selectedRoundDisplayName: '',
           currentGameMatch: tournamentData,
           showGameOrganization: true,
           showTournamentModal: false,
-          selectedTournament: null
+          selectedTournament: null,
+          activeRoundTab: activeRoundTab,
+          activeRoundSubTab: { [activeRoundTab]: 'matches' }
         });
       }
     }
@@ -5061,15 +5063,13 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
     );
   })}
 </div>
-
-
-
-
-
-                  </div>
+</div>
 
 {/* Round Content */}
-{this.state.activeRoundTab && this.state.currentGameMatch.rounds?.map((round: TournamentRound, index: number) => (
+{console.log('activeRoundTab', this.state.activeRoundTab)}
+{console.log('currentGameMatch.rounds', this.state.currentGameMatch.rounds)}
+{ this.state.currentGameMatch.rounds?.map((round: TournamentRound, index: number) => (
+  console.log('round', round.id),
   this.state.activeRoundTab === round.id && (
     <div key={round.id} className="bg-white rounded-2xl shadow-lg border border-gray-100">
       {/* Round Header */}
