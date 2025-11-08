@@ -175,7 +175,6 @@ interface NotificationHistory {
   matchId?: number;
   matchName?: string;
 }
-
 interface MatchesState {
   activeTab: 'schedule' | 'scheduled' | 'previous' | 'settings' | 'notifications';
   isCreatingMatch: boolean;
@@ -526,7 +525,6 @@ selectedRoundDisplayName: '',
     { value: 'lastball-no-ballinhand-yes', label: 'Last Ball Last Pocket: No, Ball in Hand: Yes' },
     { value: 'lastball-no-ballinhand-no', label: 'Last Ball Last Pocket: No, Ball in Hand: No' }
   ];
-
   // Hardcoded data - now using API data
   // private readonly scheduledMatches: Match[] = [
   //   {
@@ -721,7 +719,6 @@ selectedRoundDisplayName: '',
         return this.registeredCustomers;
     }
   };
-
   private getFilteredCustomers = (): any[] => {
     const { notificationRecipients } = this.state.matchForm;
     if (!notificationRecipients || notificationRecipients === 'all') {
@@ -743,7 +740,6 @@ selectedRoundDisplayName: '',
       }
     });
   };
-
   private handleSelectAllSkillCustomers = (): void => {
     const paginatedCustomers = this.getPaginatedCustomers();
     const currentSelected = this.state.matchForm.selectedSkillCustomers || [];
@@ -917,7 +913,6 @@ selectedRoundDisplayName: '',
       });
     }
   };
-
   // Tournament Dashboard Handlers
   private handleSelectAllPlayers = (): void => {
     if (!this.state.currentGameMatch || !this.state.currentGameMatch.allPlayers) return;
@@ -934,7 +929,6 @@ selectedRoundDisplayName: '',
       }
     });
   };
-
   private handleDeselectAllPlayers = (): void => {
     if (!this.state.currentGameMatch || !this.state.currentGameMatch.allPlayers) return;
     
@@ -1097,8 +1091,6 @@ selectedRoundDisplayName: '',
     const targetRoundName = this.state.rounds[targetRoundIndex].displayName || this.state.rounds[targetRoundIndex].name;
     console.log(`✅ Moved ${selectedPlayers.length} players to "${targetRoundName}"`);
   };
-
-
   private handleMoveSelectedToLobby = (): void => {
     if (!this.state.currentGameMatch || !this.state.currentGameMatch.allPlayers) return;
     
@@ -1126,7 +1118,6 @@ selectedRoundDisplayName: '',
 
     console.log('🏟️ Moved', selectedPlayerIds.length, 'players to lobby');
   };
-
   private handleShuffleSelected = (): void => {
     if (!this.state.currentGameMatch || !this.state.currentGameMatch.allPlayers) return;
     
@@ -1183,9 +1174,11 @@ selectedRoundDisplayName: '',
   private handleTournamentClick = async (tournamentId: string, tournamentName: string, organizerId?: string, venueId?: string, tournamentStatus?: string): Promise<void> => {
     console.log('🏆 Tournament clicked:', { tournamentId, tournamentName, organizerId, venueId, tournamentStatus });
     
-    // Normalize status to lowercase for comparison
-    const status = (tournamentStatus || 'scheduled').toLowerCase();
-    console.log('🏆 Tournament status:', status);
+    // Normalize status to lowercase for comparison (use stored status if available)
+    const storedStatusBeforeFetch = tournamentStatus ? null : this.getStoredTournamentStatus(tournamentId);
+    let derivedStatus = (tournamentStatus || storedStatusBeforeFetch || 'scheduled').toLowerCase();
+    console.log('🏆 Tournament status (initial):', derivedStatus);
+    let tournamentStatusData: any = null;
     
     // Set loading state
     this.setState({
@@ -1197,7 +1190,7 @@ selectedRoundDisplayName: '',
       console.log('👥 Step 1: Fetching registered players for tournament');
       console.log('🏆 Tournament ID:', tournamentId);
       console.log('🏆 Tournament Name:', tournamentName);
-      console.log('🏆 Tournament Status:', status);
+      console.log('🏆 Tournament Status (before API):', derivedStatus);
       console.log('🌐 API Base URL:', import.meta.env.VITE_API_BASE_URL || 'http://localhost:3005/api/v1');
       
       // Verify user is authenticated before making the call
@@ -1217,6 +1210,12 @@ selectedRoundDisplayName: '',
       
       // Fetch registered players
       const playersResponse = await matchesApiService.getTournamentPlayers(tournamentId);
+      tournamentStatusData = playersResponse.data?.tournament_status ?? null;
+      const apiTournamentStatus = playersResponse.data?.tournament_status?.status;
+      if (apiTournamentStatus) {
+        derivedStatus = apiTournamentStatus.toLowerCase();
+      }
+      this.saveTournamentStatus(tournamentId, derivedStatus, tournamentStatusData);
       
       console.log('👥 API call completed, response received');
       console.log('👥 Response success:', playersResponse.success);
@@ -1275,15 +1274,14 @@ selectedRoundDisplayName: '',
       // Check tournament status to determine routing
       // If status is "started", "running", or "completed" → go directly to dashboard
       // If status is "registration_open" or "scheduled" → show popup
-      const shouldGoToDashboard = ['started', 'running', 'ongoing', 'completed'].includes(status);
-      const shouldShowPopup = ['registration_open', 'scheduled', 'upcoming', 'draft'].includes(status);
+      const shouldGoToDashboard = ['started', 'running', 'ongoing', 'completed'].includes(derivedStatus);
+      const shouldShowPopup = ['registration_open', 'scheduled', 'upcoming', 'draft'].includes(derivedStatus);
 
       console.log('🎯 Routing decision:', {
-        status,
+        status: derivedStatus,
         shouldGoToDashboard,
         shouldShowPopup
       });
-
       if (shouldGoToDashboard) {
         // Go directly to tournament dashboard
         console.log('🎮 Status is started/running/completed - going directly to dashboard');
@@ -1294,12 +1292,12 @@ selectedRoundDisplayName: '',
         const tournamentData: TournamentDashboard = {
           id: tournamentIdNumber,
           name: tournamentName,
-          gameType: '9-ball', // Default, can be updated from API if needed
+          gameType: '9-ball', // Default game type until API provides it
           organizerName: 'Tournament Organizer',
           organizerDescription: 'Professional tournament management',
           date: new Date('2025-10-15T14:00:00').toISOString(),
           time: new Date('2025-10-15T14:00:00').toLocaleTimeString(),
-          status: 'active',
+          status: derivedStatus,
           players: currentParticipants,
           maxPlayers: 50,
           entryFee: 50,
@@ -1318,7 +1316,7 @@ selectedRoundDisplayName: '',
           })),
           rounds: [],
           currentRound: null,
-          tournamentStarted: true,
+          tournamentStarted: ['started', 'running', 'ongoing', 'completed'].includes(derivedStatus),
           registeredPlayers: registeredPlayers,
           tournamentId: tournamentId // Store original tournament ID string for API calls
         };
@@ -1332,7 +1330,7 @@ selectedRoundDisplayName: '',
           loading: false
         });
 
-        console.log('✅ Navigated directly to tournament dashboard (status:', status, ')');
+        console.log('✅ Navigated directly to tournament dashboard (status:', derivedStatus, ')');
         
       } else if (shouldShowPopup) {
         // Show popup with registered users (don't start tournament automatically)
@@ -1341,7 +1339,7 @@ selectedRoundDisplayName: '',
         const tournamentData = {
           id: tournamentId,
           name: tournamentName,
-          status: status,
+          status: derivedStatus,
           type: 'single_elimination',
           gameType: '9-ball',
           startDate: new Date('2025-10-15T14:00:00').toISOString(),
@@ -1364,17 +1362,17 @@ selectedRoundDisplayName: '',
           showGameOrganization: false,
           loading: false
         }, () => {
-          console.log('✅ Popup shown with registered users (status:', status, ')');
+          console.log('✅ Popup shown with registered users (status:', derivedStatus, ')');
         });
         
       } else {
         // Unknown status - default to popup
-        console.warn('⚠️ Unknown tournament status:', status, '- defaulting to popup');
+        console.warn('⚠️ Unknown tournament status:', derivedStatus, '- defaulting to popup');
         
         const tournamentData = {
           id: tournamentId,
           name: tournamentName,
-          status: status,
+          status: derivedStatus,
           type: 'single_elimination',
           gameType: '9-ball',
           startDate: new Date('2025-10-15T14:00:00').toISOString(),
@@ -1445,11 +1443,8 @@ selectedRoundDisplayName: '',
         });
         return;
       }
-      
       console.log('✅ Token found, making authenticated request...');
-      
       const response = await matchesApiService.getTournamentsByOrganizerId();
-      
       console.log('📊 Tournament API Response:', response);
       console.log('📊 Response Data:', JSON.stringify(response, null, 2));
       
@@ -1469,12 +1464,16 @@ selectedRoundDisplayName: '',
           console.log('🔍 Tournament venueId:', tournament.venueId || tournament.venue_id);
           console.log('🔍 All tournament keys:', Object.keys(tournament));
           
+          const tournamentId = tournament.id || tournament.tournamentId || 'unknown-id';
+          const storedStatus = this.getStoredTournamentStatus(tournamentId);
+          const normalizedStatus = storedStatus || (tournament.status ? tournament.status.toLowerCase() : 'scheduled');
+          
           return {
-            tournamentId: tournament.id || tournament.tournamentId || 'unknown-id',
+            tournamentId,
             tournamentName: tournament.name || tournament.tournamentName || tournament.title || 'Unnamed Tournament',
             organizerId: tournament.organizerId || tournament.organizer_id || response.data.organizerId || '',
             venueId: tournament.venueId || tournament.venue_id || tournament.venue?.id || '',
-            status: tournament.status || 'scheduled' // Store tournament status
+            status: normalizedStatus
           };
         });
         
@@ -1482,6 +1481,7 @@ selectedRoundDisplayName: '',
         console.log('🎯 Total tournaments extracted:', apiTournaments.length);
         console.log('🎯 Tournament IDs:', apiTournaments.map(t => t.tournamentId));
         console.log('🎯 Tournament Names:', apiTournaments.map(t => t.tournamentName));
+        console.log('🎯 Tournament Statuses:', apiTournaments.map(t => t.status));
         
         // Update state with extracted tournament data
         this.setState({ 
@@ -1528,6 +1528,42 @@ selectedRoundDisplayName: '',
         error: errorMessage,
         apiTournaments: []
       });
+    }
+  };
+
+  private getStoredTournamentStatus = (tournamentId: string): string | null => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    try {
+      const raw = localStorage.getItem(`tournament_status_${tournamentId}`);
+      if (!raw) {
+        return null;
+      }
+      const parsed = JSON.parse(raw);
+      const stored = parsed?.status;
+      return stored ? stored.toString().toLowerCase() : null;
+    } catch (error) {
+      console.error('❌ Failed to read stored tournament status', error);
+      return null;
+    }
+  };
+
+  private saveTournamentStatus = (tournamentId: string, status: string, statusData?: any): void => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    try {
+      const payload = {
+        status: status.toLowerCase(),
+        statusData: statusData ?? null,
+        updatedAt: new Date().toISOString()
+      };
+      localStorage.setItem(`tournament_status_${tournamentId}`, JSON.stringify(payload));
+    } catch (error) {
+      console.error('❌ Failed to save tournament status', error);
     }
   };
 
@@ -1603,7 +1639,6 @@ selectedRoundDisplayName: '',
 
     return flatName || nestedName || 'Unknown Player';
   };
-
   private extractPlayerEmail = (registration: any): string => {
     // Try different possible field names for email
     const flatEmail = registration.customerEmail || 
@@ -1641,7 +1676,6 @@ selectedRoundDisplayName: '',
            (registration.player && registration.player.skillLevel) ||
            'Intermediate';
   };
-
   private getSkillColor = (skill: string): string => {
     const skillLevels = {
       'Advanced': 'bg-blue-100 text-blue-800',
@@ -1751,33 +1785,34 @@ selectedRoundDisplayName: '',
       
       const tournamentData: TournamentDashboard = {
         id: tournamentIdNumber,
-        name: this.state.selectedTournament.name,
-        gameType: this.state.selectedTournament.gameType,
+        name: tournamentName,
+        gameType: '9-ball', // Default game type until API provides it
         organizerName: 'Tournament Organizer',
         organizerDescription: 'Professional tournament management',
-        date: this.state.selectedTournament.startDate,
-        time: new Date(this.state.selectedTournament.startDate).toLocaleTimeString(),
-        status: 'active',
-        players: this.state.selectedTournament.registeredPlayers?.length || 0,
-        maxPlayers: this.state.selectedTournament.maxParticipants || 50,
-        entryFee: this.state.selectedTournament.entryFee,
-        venue: this.state.selectedTournament.venue,
+        date: new Date('2025-10-15T14:00:00').toISOString(),
+        time: new Date('2025-10-15T14:00:00').toLocaleTimeString(),
+        status: derivedStatus,
+        players: currentParticipants,
+        maxPlayers: 50,
+        entryFee: 50,
+        venue: 'Delhi Sports Complex - Main Branch',
         ballRules: 'Standard tournament rules',
-        allPlayers: this.state.selectedTournament.registeredPlayers?.map((player: any) => ({
-          id: player.id,
+        allPlayers: registeredPlayers.map((player: any) => ({
+          id: player.id.toString(),
           name: player.name,
           email: player.email,
           skill: player.skillLevel,
           profilePic: player.profilePic,
           selected: false,
-          status: 'available' as const, // available, in_round, in_match, in_lobby, eliminated
+          status: 'available' as const,
           currentRound: null,
           currentMatch: null
-        })) || [],
+        })),
         rounds: [],
         currentRound: null,
-        tournamentStarted: true,
-        tournamentId: tournamentIdString // Store original tournament ID string for API calls
+        tournamentStarted: ['started', 'running', 'ongoing', 'completed'].includes(derivedStatus),
+        registeredPlayers: registeredPlayers,
+        tournamentId: tournamentId // Store original tournament ID string for API calls
       };
 
       // Set the current game match and show tournament dashboard
@@ -1789,14 +1824,12 @@ selectedRoundDisplayName: '',
       });
 
       console.log('🎮 Tournament Dashboard setup complete with', tournamentData.allPlayers.length, 'players');
-      
     } catch (error) {
       console.error('❌ Error starting tournament:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to start tournament';
       
       // Show error message to user
       alert(`Failed to start tournament: ${errorMessage}`);
-      
       // Still proceed with game organization if it's not an auth error
       if (!errorMessage.includes('Session expired') && !errorMessage.includes('401')) {
         // Create tournament data even if API call failed
@@ -1808,6 +1841,7 @@ selectedRoundDisplayName: '',
           ? this.state.selectedTournament.id
           : tournamentIdString.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
         
+        const fallbackStatus = (this.state.selectedTournament.status || 'active').toString().toLowerCase();
         const tournamentData: TournamentDashboard = {
           id: tournamentIdNumber,
           name: this.state.selectedTournament.name,
@@ -1816,7 +1850,7 @@ selectedRoundDisplayName: '',
           organizerDescription: 'Professional tournament management',
           date: this.state.selectedTournament.startDate,
           time: new Date(this.state.selectedTournament.startDate).toLocaleTimeString(),
-          status: 'active',
+          status: fallbackStatus,
           players: this.state.selectedTournament.registeredPlayers?.length || 0,
           maxPlayers: this.state.selectedTournament.maxParticipants || 50,
           entryFee: this.state.selectedTournament.entryFee,
@@ -1835,7 +1869,8 @@ selectedRoundDisplayName: '',
           })) || [],
           rounds: [],
           currentRound: null,
-          tournamentStarted: true,
+          tournamentStarted: ['started', 'running', 'ongoing', 'completed'].includes(fallbackStatus),
+          registeredPlayers: this.state.selectedTournament.registeredPlayers,
           tournamentId: tournamentIdString // Store original tournament ID string for API calls
         };
 
@@ -1973,9 +2008,6 @@ selectedRoundDisplayName: '',
       selectedMatchForWinner: matchId
     });
   };
-
-
-
   private selectWinner = (winnerPlayer: Player): void => {
     if (!this.state.selectedMatchForWinner) return;
   
@@ -2170,7 +2202,6 @@ selectedRoundDisplayName: '',
       deleteConfirmCallback: callback
     });
   };
-
   private hideDeleteConfirm = (): void => {
     this.setState({
       showDeleteConfirmModal: false,
@@ -2363,9 +2394,6 @@ selectedRoundDisplayName: '',
       }
     );
   };
-
-  
- 
   // Method to start editing round name
   private startEditingRoundName = (roundId: string): void => {
     const round = this.state.rounds.find(r => r.id === roundId);
@@ -2546,18 +2574,14 @@ selectedRoundDisplayName: '',
       );
       return;
     }
-    
     const currentPlayersInTarget = targetRound.players.length;
     const playersAfterMove = currentPlayersInTarget + selectedWinners.length;
-
     // Allow odd numbers when moving from winners tab - winners can advance to next round
     // The validation for even numbers will happen when creating matches, not when moving winners
     console.log(`Moving ${selectedWinners.length} winners to ${targetRound.displayName || targetRound.name}. Target will have ${playersAfterMove} players.`);
-
     // Determine if we're moving to a previous round (back to winners) or next round (advance to players)
     const currentRoundIndex = this.state.rounds.findIndex(r => r.id === sourceRoundId);
     const isMovingToPreviousRound = targetRoundIndex < currentRoundIndex;
-    
     // For backward movement, validate that winners can only move back to their lastWinningRound
     if (isMovingToPreviousRound) {
       // Check if any selected winner is trying to move beyond their lastWinningRound
@@ -2742,7 +2766,6 @@ selectedRoundDisplayName: '',
     this.setState({ rounds: updatedRounds });
     console.log(`Shuffled ${playersToShuffle.length} unmatched players and created ${newMatches.length} new matches in ${round.displayName || round.name}. Preserved ${round.matches.length} existing matches.`);
   };
-
   private freezeRound = (roundId: string): void => {
     const roundIndex = this.state.rounds.findIndex(r => r.id === roundId);
     if (roundIndex === -1) {
@@ -2940,7 +2963,6 @@ selectedRoundDisplayName: '',
       }
       return;
     }
-
     // Find target round
     const targetRoundIndex = this.state.rounds.findIndex(r => r.id === targetRoundId);
     
@@ -3120,7 +3142,6 @@ selectedRoundDisplayName: '',
       'success'
     );
   };
-
   private handleStartTournament = (): void => {
     if (!this.state.selectedTournament) {
       this.showCustomAlert("No tournament selected", "error");
@@ -3319,11 +3340,9 @@ selectedRoundDisplayName: '',
       selectedLocation: match.location || null
     });
   };
-
   private handleShowNotifiedUsers = (): void => {
     this.setState({ showNotifiedUsers: true });
   };
-
   private getStatusColor = (status: string): string => {
     switch(status) {
       case 'open': return 'bg-green-100 text-green-800 border-green-200';
@@ -3520,15 +3539,6 @@ selectedRoundDisplayName: '',
       showRoundNameModal: false
     });
   };
-
-
-
-
-
-
-
-
-
 // Method to toggle loser selection for movement
 private toggleLoserSelectionForMovement = (loser: Player, roundId: string): void => {
   const updatedRounds = this.state.rounds.map(round => {
@@ -3686,8 +3696,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
   const targetRoundName = this.state.rounds[targetRoundIndex].displayName || this.state.rounds[targetRoundIndex].name;
   console.log(`Moved ${selectedLosers.length} losers from ${sourceRound.displayName || sourceRound.name} to ${targetRoundName}`);
 };
-
-
 /*Methods Ending Here*/
 
   render() {
@@ -3733,7 +3741,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
       return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 w-full flex items-center justify-center">
           <div className="text-center">
-            <div className="text-red-500 text-6xl mb-4">âš ï¸</div>
+            <div className="text-red-500 text-6xl mb-4">⚠️</div>
             <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Data</h2>
             <p className="text-gray-600 mb-4">{this.state.error}</p>
             <button
@@ -4041,7 +4049,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
-
                     {/* Notification Section */}
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -4235,7 +4242,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                   </div>
                                 </div>
                               )}
-
                               {/* Notification Preview */}
                               <div className="bg-white p-4 rounded-lg border border-purple-200">
                                 <h4 className="font-medium text-purple-900 mb-2">Notification Preview</h4>
@@ -4432,7 +4438,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           Notified Users (0)
                         </button>
                       </div>
-
                       {/* Registered Players Section - Empty for API tournaments */}
                       <div className="mt-6 pt-6 border-t border-gray-100">
                         <h4 className="text-sm font-medium text-gray-700 mb-4">Registered Players (0)</h4>
@@ -4612,7 +4617,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                   </div>
                 </div>
               </div>
-
               {/* Tournament Info */}
               <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
                 <div className="bg-gray-50 p-4 rounded-lg mb-6">
@@ -4773,7 +4777,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           Tournament Results
                         </button>
                       )}
-
    {/* Round Selection with Stats */}
     <div className="bg-white p-4 rounded-lg mb-4 border border-gray-200">
       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -5309,7 +5312,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                       Reshuffle All Players
                                     </button>
                                     )}
-
                                     {/* Start Round Button - Only show if round is pending (matches may or may not exist) */}
                                     {round.status === 'pending' && (
                                       <button
@@ -5496,7 +5498,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                       )}
                                     </div>
                                   )}
-
 {/* LIVE Match Details */}
 {match.status === 'active' && (
                                     <div className="mt-4 bg-gradient-to-r from-red-50 to-pink-50 rounded-lg p-4 border border-red-200">
@@ -5662,7 +5663,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                           matchedPlayerIds: Array.from(matchedPlayerIds),
                                           unmatchedPlayers: unmatchedPlayers.map(p => ({ name: p.name, status: p.status, id: p.id }))
                                         });
-                                        
                                         return unmatchedPlayers.length > 0 ? (
                                           <div className="mt-6">
                                             <h4 className="text-lg font-semibold text-gray-900 mb-4">Unmatched Players ({unmatchedPlayers.length})</h4>
@@ -5838,207 +5838,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                           </div>
                                         ) : null;
                                       })()}
-                      
                     </div>
-                                  ) : round.players.length > 0 ? (
-                      <div>
-                       <div className="mb-4">
-                                        <div className="flex items-center justify-between mb-2">
-                                          <h4 className="text-lg font-semibold text-gray-900">Players in Round ({round.players.length})</h4>
-                                          <div className="flex gap-2">
-                                            <button
-                                              onClick={() => {
-                                                // Select all players in this round
-                                                const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
-                                                  r.id === round.id 
-                                                    ? { ...r, players: r.players.map(p => ({ ...p, selected: true })) }
-                                                    : r
-                                                );
-                                                const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
-                                                  round.players.some(rp => rp.id === p.id) ? { ...p, selected: true } : p
-                                                );
-                                                this.setState({
-                                                  currentGameMatch: {
-                                                    ...this.state.currentGameMatch!,
-                                                    allPlayers: updatedPlayers,
-                                                    rounds: updatedRounds
-                                                  }
-                                                });
-                                              }}
-                                              className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
-                                            >
-                                              Select All
-                                            </button>
-                                            <button
-                                              onClick={() => {
-                                                // Deselect all players in this round
-                                                const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
-                                                  r.id === round.id 
-                                                    ? { ...r, players: r.players.map(p => ({ ...p, selected: false })) }
-                                                    : r
-                                                );
-                                                const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
-                                                  round.players.some(rp => rp.id === p.id) ? { ...p, selected: false } : p
-                                                );
-                                                this.setState({
-                                                  currentGameMatch: {
-                                                    ...this.state.currentGameMatch!,
-                                                    allPlayers: updatedPlayers,
-                                                    rounds: updatedRounds
-                                                  }
-                                                });
-                                              }}
-                                              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
-                                            >
-                                              Deselect All
-                                            </button>
-                                          </div>
-                                        </div>
-                                        <div className="flex items-center justify-between mb-4">
-                                          <p className="text-gray-600 text-sm">Select players you want to exclude from shuffling</p>
-                                          {round.players.filter(p => p.selected).length > 0 && (
-                                            <div className="flex gap-2">
-                                              <button
-                                                onClick={() => {
-                                                  // Move selected players back to available
-                                                  const selectedPlayerIds = round.players.filter(p => p.selected).map(p => p.id);
-                                                  
-                                                  // Remove selected players from round
-                                                  const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
-                                                    r.id === round.id 
-                                                      ? { ...r, players: r.players.filter(p => !p.selected) }
-                                                      : r
-                                                  );
-                                                  
-                                                  // Update players status back to available
-                                                  const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
-                                                    selectedPlayerIds.includes(p.id) 
-                                                      ? { ...p, status: 'available' as const, selected: false, currentRound: null }
-                                                      : p
-                                                  );
-                                                  
-                                                  this.setState({
-                                                    currentGameMatch: {
-                                                      ...this.state.currentGameMatch!,
-                                                      allPlayers: updatedPlayers,
-                                                      rounds: updatedRounds
-                                                    }
-                                                  });
-                                                  
-                                                  console.log('🔄 Moved', selectedPlayerIds.length, 'players back to available');
-                                                }}
-                                                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium flex items-center gap-2"
-                                              >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
-                                                </svg>
-                                                Back to Available ({round.players.filter(p => p.selected).length})
-                                              </button>
-                                              
-                                              <button
-                                                onClick={() => {
-                                                  // Move selected players to waiting area
-                                                  const selectedPlayerIds = round.players.filter(p => p.selected).map(p => p.id);
-                                                  
-                                                  // Update selected players status to waiting
-                                                  const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
-                                                    r.id === round.id 
-                                                      ? { ...r, players: r.players.map(p => 
-                                                          p.selected 
-                                                            ? { ...p, status: 'waiting' as const, selected: false }
-                                                            : p
-                                                        ) }
-                                                      : r
-                                                  );
-                                                  
-                                                  const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
-                                                    selectedPlayerIds.includes(p.id) 
-                                                      ? { ...p, status: 'waiting' as const, selected: false }
-                                                      : p
-                                                  );
-                                                  
-                                                  this.setState({
-                                                    currentGameMatch: {
-                                                      ...this.state.currentGameMatch!,
-                                                      allPlayers: updatedPlayers,
-                                                      rounds: updatedRounds
-                                                    }
-                                                  });
-                                                  
-                                                  console.log('⏳ Moved', selectedPlayerIds.length, 'players to waiting area');
-                                                }}
-                                                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium flex items-center gap-2"
-                                              >
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                </svg>
-                                                Move to Waiting Area ({round.players.filter(p => p.selected).length})
-                                              </button>
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                        {round.players.map((player: Player, index: number) => (
-                                          <div 
-                                            key={player.id} 
-                                            className={`bg-blue-50 p-4 rounded-lg border-2 transition-all cursor-pointer hover:border-blue-300 hover:shadow-md ${
-                                              player.selected ? 'border-blue-500 bg-blue-100' : 'border-blue-200'
-                                            }`}
-                                            onClick={() => {
-                                              // Toggle selection for this player
-                                              const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
-                                                r.id === round.id 
-                                                  ? { ...r, players: r.players.map(p => p.id === player.id ? { ...p, selected: !p.selected } : p) }
-                                                  : r
-                                              );
-                                              const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
-                                                p.id === player.id ? { ...p, selected: !p.selected } : p
-                                              );
-                                              this.setState({
-                                                currentGameMatch: {
-                                                  ...this.state.currentGameMatch!,
-                                                  allPlayers: updatedPlayers,
-                                                  rounds: updatedRounds
-                                                }
-                                              });
-                                            }}
-                                          >
-                                            <div className="flex items-center gap-3 mb-3">
-                                              <img
-                                                src={player.profilePic}
-                                                alt={player.name}
-                                                className="w-12 h-12 rounded-full object-cover border-2 border-blue-400"
-                                              />
-                                              <div className="flex-1">
-                                                <div className="font-semibold text-gray-900">{player.name}</div>
-                                                <div className="text-sm text-gray-600">{player.email}</div>
-                                              </div>
-                                              <div className="flex items-center gap-2">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={player.selected || false}
-                                                  onChange={() => {}} // Handled by parent onClick
-                                                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-                                                />
-                                              </div>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                player.skill === 'Beginner' ? 'bg-green-100 text-green-800' :
-                                                player.skill === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
-                                                'bg-red-100 text-red-800'
-                                              }`}>
-                                                {player.skill}
-                                              </span>
-                                              <div className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
-                                                Player #{index + 1}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ))}
-                                      </div>
-                      </div>
                     ) : (
                       <div className="text-center py-12">
                         <div className="text-gray-500 text-lg mb-2">No players in this round yet</div>
@@ -6047,87 +5847,28 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                   )}
                 </div>
               )}
-
  {/* Waiting Area Tab */}
  {this.state.activeRoundSubTab[round.id] === 'waiting' && (
-                                <div>
-                                  <div className="mb-4">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <h4 className="text-lg font-semibold text-gray-900">Players in Waiting Area</h4>
-                                      <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
-                                        {round.players?.filter(p => p.status === 'waiting').length || 0} Players
-                                      </span>
-                                    </div>
-                                    <div className="flex gap-2 mb-4">
-                                      <button
-                                        onClick={() => {
-                                          // Select all waiting players
-                                          const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
-                                            r.id === round.id 
-                                              ? { ...r, players: r.players.map(p => p.status === 'waiting' ? { ...p, selected: true } : p) }
-                                              : r
-                                          );
-                                          const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
-                                            round.players.some(rp => rp.id === p.id && rp.status === 'waiting') ? { ...p, selected: true } : p
-                                          );
-                                          this.setState({
-                                            currentGameMatch: {
-                                              ...this.state.currentGameMatch!,
-                                              allPlayers: updatedPlayers,
-                                              rounds: updatedRounds
-                                            }
-                                          });
-                                        }}
-                                        className="px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-sm font-medium"
-                                      >
-                                        Select All
-                                      </button>
-                                      <button
-                                        onClick={() => {
-                                          // Deselect all waiting players
-                                          const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
-                                            r.id === round.id 
-                                              ? { ...r, players: r.players.map(p => p.status === 'waiting' ? { ...p, selected: false } : p) }
-                                              : r
-                                          );
-                                          const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
-                                            round.players.some(rp => rp.id === p.id && rp.status === 'waiting') ? { ...p, selected: false } : p
-                                          );
-                                          this.setState({
-                                            currentGameMatch: {
-                                              ...this.state.currentGameMatch!,
-                                              allPlayers: updatedPlayers,
-                                              rounds: updatedRounds
-                                            }
-                                          });
-                                        }}
-                                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
-                                      >
-                                        Deselect All
-                                      </button>
-                                    </div>
-                                    
-                                    {/* Navigation Options for Selected Players */}
-                                    {round.players?.filter(p => p.status === 'waiting' && p.selected).length > 0 && (
-                                      <div className="flex gap-2 mb-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                                  <div>
+                                    <div className="mb-4">
+                                      <div className="flex items-center justify-between mb-2">
+                                        <h4 className="text-lg font-semibold text-gray-900">Players in Waiting Area</h4>
+                                        <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                                          {round.players?.filter(p => p.status === 'waiting').length || 0} Players
+                                        </span>
+                                      </div>
+                                      <div className="flex gap-2 mb-4">
                                         <button
                                           onClick={() => {
-                                            // Move selected players back to dashboard (available)
-                                            const selectedPlayerIds = round.players.filter(p => p.status === 'waiting' && p.selected).map(p => p.id);
-                                            
-                                            // Remove from round and update status to available
+                                            // Select all waiting players
                                             const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
                                               r.id === round.id 
-                                                ? { ...r, players: r.players.filter(p => !(p.status === 'waiting' && p.selected)) }
+                                                ? { ...r, players: r.players.map(p => p.status === 'waiting' ? { ...p, selected: true } : p) }
                                                 : r
                                             );
-                                            
                                             const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
-                                              selectedPlayerIds.includes(p.id) 
-                                                ? { ...p, status: 'available' as const, selected: false, currentRound: null }
-                                                : p
+                                              round.players.some(rp => rp.id === p.id && rp.status === 'waiting') ? { ...p, selected: true } : p
                                             );
-                                            
                                             this.setState({
                                               currentGameMatch: {
                                                 ...this.state.currentGameMatch!,
@@ -6135,39 +5876,22 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                                 rounds: updatedRounds
                                               }
                                             });
-                                            
-                                            console.log('🏠 Moved', selectedPlayerIds.length, 'players back to dashboard');
                                           }}
-                                          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium flex items-center gap-2"
+                                          className="px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-sm font-medium"
                                         >
-                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                                          </svg>
-                                          Back to Dashboard ({round.players?.filter(p => p.status === 'waiting' && p.selected).length})
+                                          Select All
                                         </button>
-                                        
                                         <button
                                           onClick={() => {
-                                            // Move selected players back to matches (available for shuffling)
-                                            const selectedPlayerIds = round.players.filter(p => p.status === 'waiting' && p.selected).map(p => p.id);
-                                            
-                                            // Update status from waiting to in_round (available for shuffling)
+                                            // Deselect all waiting players
                                             const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
                                               r.id === round.id 
-                                                ? { ...r, players: r.players.map(p => 
-                                                    p.status === 'waiting' && p.selected 
-                                                      ? { ...p, status: 'in_round' as const, selected: false }
-                                                      : p
-                                                  ) }
+                                                ? { ...r, players: r.players.map(p => p.status === 'waiting' ? { ...p, selected: false } : p) }
                                                 : r
                                             );
-                                            
                                             const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
-                                              selectedPlayerIds.includes(p.id) 
-                                                ? { ...p, status: 'in_round' as const, selected: false }
-                                                : p
+                                              round.players.some(rp => rp.id === p.id && rp.status === 'waiting') ? { ...p, selected: false } : p
                                             );
-                                            
                                             this.setState({
                                               currentGameMatch: {
                                                 ...this.state.currentGameMatch!,
@@ -6175,58 +5899,132 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                                 rounds: updatedRounds
                                               }
                                             });
-                                            
-                                            console.log('🎲 Moved', selectedPlayerIds.length, 'players back to matches section');
                                           }}
-                                          className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center gap-2"
+                                          className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
                                         >
-                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                          </svg>
-                                          Back to Matches ({round.players?.filter(p => p.status === 'waiting' && p.selected).length})
+                                          Deselect All
                                         </button>
-                                        
-                                        <button
-                                          onClick={() => {
-                                            // Move selected players to waiting area manually
-                                            const selectedPlayerIds = round.players.filter(p => p.status === 'waiting' && p.selected).map(p => p.id);
-                                            
-                                            // Players are already in waiting area, just deselect them
-                                            const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
-                                              r.id === round.id 
-                                                ? { ...r, players: r.players.map(p => 
-                                                    p.status === 'waiting' && p.selected 
-                                                      ? { ...p, selected: false }
-                                                      : p
-                                                  ) }
-                                                : r
-                                            );
-                                            
-                                            const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
-                                              selectedPlayerIds.includes(p.id) 
-                                                ? { ...p, selected: false }
-                                                : p
-                                            );
-                                            
-                                            this.setState({
-                                              currentGameMatch: {
-                                                ...this.state.currentGameMatch!,
-                                                allPlayers: updatedPlayers,
-                                                rounds: updatedRounds
-                                              }
-                                            });
-                                            
-                                            console.log('✅ Kept', selectedPlayerIds.length, 'players in waiting area');
-                                          }}
-                                          className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium flex items-center gap-2"
-                                        >
-                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                          </svg>
-                                          Keep in Waiting Area ({round.players?.filter(p => p.status === 'waiting' && p.selected).length})
-                                        </button>
-                                        
-                                        {/* Move to Other Rounds */}
+                                      </div>
+                                      
+                                      {/* Navigation Options for Selected Players */}
+                                      {round.players?.filter(p => p.status === 'waiting' && p.selected).length > 0 && (
+                                        <div className="flex gap-2 mb-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                                          <button
+                                            onClick={() => {
+                                              // Move selected players back to dashboard (available)
+                                              const selectedPlayerIds = round.players.filter(p => p.status === 'waiting' && p.selected).map(p => p.id);
+                                              
+                                              // Remove from round and update status to available
+                                              const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                r.id === round.id 
+                                                  ? { ...r, players: r.players.filter(p => !(p.status === 'waiting' && p.selected)) }
+                                                  : r
+                                              );
+                                              
+                                              const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                selectedPlayerIds.includes(p.id) 
+                                                  ? { ...p, status: 'available' as const, selected: false, currentRound: null }
+                                                  : p
+                                              );
+                                              
+                                              this.setState({
+                                                currentGameMatch: {
+                                                  ...this.state.currentGameMatch!,
+                                                  allPlayers: updatedPlayers,
+                                                  rounds: updatedRounds
+                                                }
+                                              });
+                                              
+                                              console.log('🏠 Moved', selectedPlayerIds.length, 'players back to dashboard');
+                                            }}
+                                            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium flex items-center gap-2"
+                                          >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                            </svg>
+                                            Back to Dashboard ({round.players?.filter(p => p.status === 'waiting' && p.selected).length})
+                                          </button>
+                                          
+                                          <button
+                                            onClick={() => {
+                                              // Move selected players back to matches (available for shuffling)
+                                              const selectedPlayerIds = round.players.filter(p => p.status === 'waiting' && p.selected).map(p => p.id);
+                                              
+                                              // Update status from waiting to in_round (available for shuffling)
+                                              const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                r.id === round.id 
+                                                  ? { ...r, players: r.players.map(p => 
+                                                      p.status === 'waiting' && p.selected 
+                                                        ? { ...p, status: 'in_round' as const, selected: false }
+                                                        : p
+                                                    ) }
+                                                  : r
+                                              );
+                                              
+                                              const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                selectedPlayerIds.includes(p.id) 
+                                                  ? { ...p, status: 'in_round' as const, selected: false }
+                                                  : p
+                                              );
+                                              
+                                              this.setState({
+                                                currentGameMatch: {
+                                                  ...this.state.currentGameMatch!,
+                                                  allPlayers: updatedPlayers,
+                                                  rounds: updatedRounds
+                                                }
+                                              });
+                                              
+                                              console.log('🎲 Moved', selectedPlayerIds.length, 'players back to matches section');
+                                            }}
+                                            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center gap-2"
+                                          >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Back to Matches ({round.players?.filter(p => p.status === 'waiting' && p.selected).length})
+                                          </button>
+                                          
+                                          <button
+                                            onClick={() => {
+                                              // Move selected players to waiting area manually
+                                              const selectedPlayerIds = round.players.filter(p => p.status === 'waiting' && p.selected).map(p => p.id);
+                                              
+                                              // Players are already in waiting area, just deselect them
+                                              const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                r.id === round.id 
+                                                  ? { ...r, players: r.players.map(p => 
+                                                      p.status === 'waiting' && p.selected 
+                                                        ? { ...p, selected: false }
+                                                        : p
+                                                    ) }
+                                                  : r
+                                              );
+                                              
+                                              const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                selectedPlayerIds.includes(p.id) 
+                                                  ? { ...p, selected: false }
+                                                  : p
+                                              );
+                                              
+                                              this.setState({
+                                                currentGameMatch: {
+                                                  ...this.state.currentGameMatch!,
+                                                  allPlayers: updatedPlayers,
+                                                  rounds: updatedRounds
+                                                }
+                                              });
+                                              
+                                              console.log('✅ Kept', selectedPlayerIds.length, 'players in waiting area');
+                                            }}
+                                            className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium flex items-center gap-2"
+                                          >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Keep in Waiting Area ({round.players?.filter(p => p.status === 'waiting' && p.selected).length})
+                                          </button>
+                                          {/* Move to Other Rounds */}
                                         {this.state.currentGameMatch!.rounds!.filter(r => r.id !== round.id).length > 0 && (
                                           <select
                                             onChange={(e) => {                                             
@@ -6403,7 +6201,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                             </div>
             </div>
             )}
-
              {/* Original Players Display (when no sub-tabs) */}
              {this.state.activeRoundTab !== round.id && (round.players.length > 0 ? (
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -6482,33 +6279,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                       className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                                       onClick={(e) => e.stopPropagation()}
                                     />
-                                    /*<button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        // Move single player to lobby
-                                        const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
-                                          r.id === round.id ? { ...r, players: r.players.filter(p => p.id !== player.id) } : r
-                                        );
-                                        const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
-                                          p.id === player.id 
-                                            ? { ...p, status: 'in_lobby' as const, currentRound: null, selected: false }
-                                            : p
-                                        );
-                                        this.setState({
-                                          currentGameMatch: {
-                                            ...this.state.currentGameMatch!,
-                                            allPlayers: updatedPlayers,
-                                            rounds: updatedRounds
-                                          }
-                                        });
-                                      }}
-                                      className="text-gray-400 hover:text-red-600 transition-colors text-xs"
-                                      title="Move to Lobby"
-                                    >
-                                      🏟️
-                                    </button>
-                                    */
-
                                   </div>
                                 </div>
                               </div>
@@ -6576,7 +6346,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                 </button>
                               </div>
                             </div>
-                            
                             <div className="flex items-center gap-3">
                               <button
                                 onClick={() => {
@@ -6634,8 +6403,8 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     </div>
                   ))
                   )}
-                          </div>
-                        )}
+                </div>
+              )}
 
               {/* Dual Lobby System */}
               {(this.state.currentGameMatch.allPlayers?.some(p => p.status === 'in_lobby') || 
@@ -6737,7 +6506,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       )}
                     </div>
                   )}
-
                   {/* Winners Lobby */}
                   {this.state.activeLobbyTab === 'winners' && (
                     <div>
@@ -6905,8 +6673,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     </button>
                   </div>
                 )}
-
-
                 {/* Tournament Bracket */}
                 {this.state.shuffledMatches.length > 0 ? (
                   <div className="bg-gray-50 p-6 rounded-lg">
@@ -6914,7 +6680,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       <h3 className="text-lg font-semibold text-gray-900">Tournament Bracket - Round 1 (First Round)</h3>
                       <div className="flex items-center gap-4">
                         <span className="text-sm text-gray-600">
-                          Round 1 (First Round): {this.state.shuffledMatches.length * 2} players â†’ {this.state.shuffledMatches.length} matches â†’ {this.state.shuffledMatches.length} winners
+                          Round 1 (First Round): {this.state.shuffledMatches.length * 2} players → {this.state.shuffledMatches.length} matches → {this.state.shuffledMatches.length} winners
                         </span>
                       </div>
                     </div>
@@ -6947,7 +6713,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                               </div>
                               <div>
                                 <div className="font-semibold text-gray-900 text-lg">{match.player1.name}</div>
-                                <div className="text-sm text-gray-600">Rank #{match.player1.rank} â€¢ Rating: {match.player1.rating}</div>
+                                <div className="text-sm text-gray-600">Rank #{match.player1.rank} • Rating: {match.player1.rating}</div>
                               </div>
                             </div>
 
@@ -6969,7 +6735,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                               </div>
                               <div>
                                 <div className="font-semibold text-gray-900 text-lg">{match.player2.name}</div>
-                                <div className="text-sm text-gray-600">Rank #{match.player2.rank} â€¢ Rating: {match.player2.rating}</div>
+                                <div className="text-sm text-gray-600">Rank #{match.player2.rank} • Rating: {match.player2.rating}</div>
                               </div>
                             </div>
                           </div>
@@ -7075,7 +6841,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     </div>
                   ))}
                 </div>
-                
                 {/* Pagination Controls for Previous Matches */}
                 {this.getPreviousMatchesTotalPages() > 1 && (
                   <div className="mt-6 flex items-center justify-between">
@@ -7214,7 +6979,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
               </div>
             </div>
           )}
-
           {/* Match Details Modal */}
           {this.state.showMatchDetails && this.state.selectedMatch && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -7270,7 +7034,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
               </div>
             </div>
           )}
-
           {/* Notified Users Modal */}
           {this.state.showNotifiedUsers && (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -7385,7 +7148,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     />
                   </div>
-
                   {/* Customer Selection */}
                   {this.state.notificationForm.notificationType === 'selected' && (
                     <div>
@@ -7458,7 +7220,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       </p>
                     </div>
                   )}
-
                   {/* Action Buttons */}
                   <div className="flex justify-end gap-4 pt-4 border-t border-gray-200">
                     <button
@@ -7506,7 +7267,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                 {/* Tournament Info and Conducted By Profile - One Line */}
                 <div className="flex items-center justify-between pr-16">
                   <div className="flex-1">
-                    <h1 className="text-3xl font-bold mb-2">ðŸŽ± {this.state.selectedMatch.name}</h1>
+                    <h1 className="text-3xl font-bold mb-2">🎱 {this.state.selectedMatch.name}</h1>
                     <div className="flex items-center gap-6 text-blue-100 text-sm">
                       <div className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
@@ -7536,7 +7297,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           className="w-12 h-12 rounded-full object-cover border-2 border-white border-opacity-30"
                         />
                         <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-400 rounded-full flex items-center justify-center">
-                          <span className="text-xs font-bold text-white">ðŸ¢</span>
+                          <span className="text-xs font-bold text-white">🏢</span>
                         </div>
                       </div>
                       <div className="text-right">
@@ -7547,11 +7308,10 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     </div>
                   )}
                 </div>
-
                 {/* Top 4 Players in Header */}
                 {this.state.selectedMatch?.topPlayers && (
                   <div className="mt-6 pt-4 border-t border-blue-400 border-opacity-30">
-                    <h3 className="text-lg font-semibold text-white mb-4 text-center">ðŸ† Top 4 Champions</h3>
+                    <h3 className="text-lg font-semibold text-white mb-4 text-center">🏆 Top 4 Champions</h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       {/* Winner */}
                       <div 
@@ -7592,7 +7352,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                             </div>
                           </div>
                           <h4 className="font-semibold text-white text-sm">{this.state.selectedMatch.topPlayers.runnerUp.name}</h4>
-                          <p className="text-blue-200 text-xs">ðŸ¥ˆ Runner-up</p>
+                          <p className="text-blue-200 text-xs">🥈 Runner-up</p>
                           <p className="text-yellow-300 text-xs font-bold">{this.state.selectedMatch.topPlayers.runnerUp.prize}</p>
                         </div>
                       </div>
@@ -7614,7 +7374,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                             </div>
                           </div>
                           <h4 className="font-semibold text-white text-sm">{this.state.selectedMatch.topPlayers.thirdPlace.name}</h4>
-                          <p className="text-blue-200 text-xs">ðŸ¥‰ 3rd Place</p>
+                          <p className="text-blue-200 text-xs">🥉 3rd Place</p>
                           <p className="text-yellow-300 text-xs font-bold">{this.state.selectedMatch.topPlayers.thirdPlace.prize}</p>
                         </div>
                       </div>
@@ -7636,7 +7396,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                             </div>
                           </div>
                           <h4 className="font-semibold text-white text-sm">{this.state.selectedMatch.topPlayers.fourthPlace.name}</h4>
-                          <p className="text-blue-200 text-xs">ðŸ… 4th Place</p>
+                          <p className="text-blue-200 text-xs">🏅 4th Place</p>
                           <p className="text-yellow-300 text-xs font-bold">{this.state.selectedMatch.topPlayers.fourthPlace.prize}</p>
                         </div>
                       </div>
@@ -7644,7 +7404,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                   </div>
                 )}
               </div>
-
               {/* Tabs */}
               <div className="flex border-b border-gray-200 flex-shrink-0">
                 <button
@@ -7728,7 +7487,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       </div>
                     </div>
                   )}
-
                   {this.state.modalActiveTab === 'tournament' && (
                     <div>
                       <h2 className="text-2xl font-semibold mb-6 text-gray-800">Tournament Bracket</h2>
@@ -7758,7 +7516,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                       />
                                       <span className="text-sm font-medium">{player.name}</span>
                                     </div>
-                                    {player.finalPosition <= 2 && <span className="text-green-600 font-bold">âœ“</span>}
+                                    {player.finalPosition <= 2 && <span className="text-green-600 font-bold">✅</span>}
                                   </div>
                                   {index % 2 === 1 && (
                                     <>
@@ -7775,7 +7533,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                           />
                                           <span className="text-sm font-medium">{this.state.selectedMatch?.registeredPlayers?.[index - 1]?.name || 'Player'}</span>
                                         </div>
-                                        {((this.state.selectedMatch?.registeredPlayers?.[index - 1]?.finalPosition || 0) <= 2) && <span className="text-green-600 font-bold">âœ“</span>}
+                                        {((this.state.selectedMatch?.registeredPlayers?.[index - 1]?.finalPosition || 0) <= 2) && <span className="text-green-600 font-bold">✅</span>}
                                       </div>
                                     </>
                                   )}
@@ -7823,7 +7581,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                         />
                                         <span className="text-sm font-medium">{player.name}</span>
                                       </div>
-                                      {player.finalPosition <= 2 && <span className="text-green-600 font-bold">âœ“</span>}
+                                      {player.finalPosition <= 2 && <span className="text-green-600 font-bold">✅</span>}
                                     </div>
                                     <div className="text-center text-gray-400 text-xs">VS</div>
                                     <div className="flex items-center justify-between p-2 rounded bg-green-50">
@@ -7845,7 +7603,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           <div className="flex items-center justify-center flex-shrink-0">
                             <ChevronRight className="w-6 h-6 text-gray-400" />
                           </div>
-
                           {/* Round 3 */}
                           <div className="flex-shrink-0 w-64">
                             <h3 className="text-lg font-semibold mb-4 text-center bg-yellow-100 text-yellow-800 py-2 rounded-lg">
@@ -7873,7 +7630,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                         />
                                         <span className="text-sm font-medium">{player.name}</span>
                                       </div>
-                                      {player.finalPosition <= 4 && <span className="text-green-600 font-bold">âœ“</span>}
+                                      {player.finalPosition <= 4 && <span className="text-green-600 font-bold">✅</span>}
                                     </div>
                                     <div className="text-center text-gray-400 text-xs">VS</div>
                                     <div className="flex items-center justify-between p-2 rounded bg-yellow-50">
@@ -7895,7 +7652,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           <div className="flex items-center justify-center flex-shrink-0">
                             <ChevronRight className="w-6 h-6 text-gray-400" />
                           </div>
-
                           {/* Semifinals */}
                           <div className="flex-shrink-0 w-64">
                             <h3 className="text-lg font-semibold mb-4 text-center bg-purple-100 text-purple-800 py-2 rounded-lg">
@@ -7923,7 +7679,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                         />
                                         <span className="text-sm font-medium">{player.name}</span>
                                       </div>
-                                      {player.finalPosition <= 2 && <span className="text-green-600 font-bold">âœ“</span>}
+                                      {player.finalPosition <= 2 && <span className="text-green-600 font-bold">✅</span>}
                                     </div>
                                     <div className="text-center text-gray-400 text-xs">VS</div>
                                     <div className="flex items-center justify-between p-2 rounded bg-purple-50">
@@ -7949,7 +7705,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           {/* Final Rankings */}
                           <div className="flex-shrink-0 w-64">
                             <h3 className="text-lg font-semibold mb-4 text-center bg-gradient-to-r from-yellow-400 to-yellow-600 text-white py-2 rounded-lg">
-                              ðŸ† Final Rankings
+                              🏆 Final Rankings
                             </h3>
                             
                             {this.state.selectedMatch.registeredPlayers && this.state.selectedMatch.registeredPlayers
@@ -7983,9 +7739,9 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                           player.finalPosition === 3 ? 'text-amber-700' :
                                           'text-blue-600'
                                         }`}>
-                                          {player.finalPosition === 1 ? 'ðŸ† Champion' : 
-                                           player.finalPosition === 2 ? 'ðŸ¥ˆ Runner-up' : 
-                                           player.finalPosition === 3 ? 'ðŸ¥‰ 3rd Place' :
+                                          {player.finalPosition === 1 ? '🏆 Champion' : 
+                                           player.finalPosition === 2 ? '🥈 Runner-up' : 
+                                           player.finalPosition === 3 ? '🥉 3rd Place' :
                                            `#${player.finalPosition} Place`}
                                         </p>
                                       </div>
@@ -8016,7 +7772,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                             <span>Eliminated</span>
                           </div>
                           <div className="flex items-center">
-                            <span className="text-green-600 font-bold mr-2">âœ“</span>
+                            <span className="text-green-600 font-bold mr-2">✅</span>
                             <span>Match Winner</span>
                           </div>
                         </div>
@@ -8028,7 +7784,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
             </div>
           </div>
         )}
-
          {/* Profile Details Modal */}
          {this.state.showProfileModal && this.state.selectedProfile && (
           <div 
@@ -8075,19 +7830,18 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     this.state.selectedProfile.skill === 'Intermediate' ? 'bg-green-100 text-green-800' :
                     'bg-gray-100 text-gray-800'
                   }`}>
-                    {this.state.selectedProfile.position === 1 ? 'ðŸ† Winner' :
-                     this.state.selectedProfile.position === 2 ? 'ðŸ¥ˆ Runner-up' :
-                     this.state.selectedProfile.position === 3 ? 'ðŸ¥‰ 3rd Place' :
-                     this.state.selectedProfile.position === 4 ? 'ðŸ… 4th Place' :
-                     this.state.selectedProfile.position === 'Tournament Director' ? 'ðŸ¢ Tournament Director' :
-                     this.state.selectedProfile.skill ? `ðŸŽ¯ ${this.state.selectedProfile.skill}` :
+                    {this.state.selectedProfile.position === 1 ? '🏆 Winner' :
+                     this.state.selectedProfile.position === 2 ? '🥈 Runner-up' :
+                     this.state.selectedProfile.position === 3 ? '🥉 3rd Place' :
+                     this.state.selectedProfile.position === 4 ? '🏅 4th Place' :
+                     this.state.selectedProfile.position === 'Tournament Director' ? '🏢 Tournament Director' :
+                     this.state.selectedProfile.skill ? `🎯 ${this.state.selectedProfile.skill}` :
                      `Position #${this.state.selectedProfile.finalPosition || this.state.selectedProfile.id}`}
                   </span>
                 </div>
               )}
                 </div>
               </div>
-
               {/* Modal Content */}
               <div className="p-6">
                 <div className="space-y-6">
@@ -8100,12 +7854,12 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                            this.state.selectedProfile.position || this.state.selectedProfile.finalPosition ? 'Tournament Position' : 'Player Information'}
                         </h3>
                         <div className="flex items-center gap-2">
-                          {this.state.selectedProfile.position === 1 && <span className="text-2xl">ðŸ†</span>}
-                          {this.state.selectedProfile.position === 2 && <span className="text-2xl">ðŸ¥ˆ</span>}
-                          {this.state.selectedProfile.position === 3 && <span className="text-2xl">ðŸ¥‰</span>}
-                          {this.state.selectedProfile.position === 4 && <span className="text-2xl">ðŸ…</span>}
-                          {this.state.selectedProfile.position === 'Tournament Director' && <span className="text-2xl">ðŸ¢</span>}
-                          {this.state.selectedProfile.skill && !this.state.selectedProfile.position && <span className="text-2xl">ðŸŽ¯</span>}
+                          {this.state.selectedProfile.position === 1 && <span className="text-2xl">🏆</span>}
+                          {this.state.selectedProfile.position === 2 && <span className="text-2xl">🥈</span>}
+                          {this.state.selectedProfile.position === 3 && <span className="text-2xl">🥉</span>}
+                          {this.state.selectedProfile.position === 4 && <span className="text-2xl">🏅</span>}
+                          {this.state.selectedProfile.position === 'Tournament Director' && <span className="text-2xl">🏢</span>}
+                          {this.state.selectedProfile.skill && !this.state.selectedProfile.position && <span className="text-2xl">🎯</span>}
                           <span className="text-lg font-bold text-gray-800">
                             {this.state.selectedProfile.position === 1 ? 'Winner' :
                              this.state.selectedProfile.position === 2 ? 'Runner-up' :
@@ -8154,7 +7908,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       {this.state.selectedProfile.email && (
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                            <span className="text-blue-600 text-sm">ðŸ“§</span>
+                            <span className="text-blue-600 text-sm">📧</span>
                           </div>
                           <span className="text-gray-700">{this.state.selectedProfile.email}</span>
                         </div>
@@ -8162,7 +7916,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       {this.state.selectedProfile.contact && (
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                            <span className="text-green-600 text-sm">ðŸ“ž</span>
+                            <span className="text-green-600 text-sm">📞</span>
                           </div>
                           <span className="text-gray-700">{this.state.selectedProfile.contact}</span>
                         </div>
@@ -8170,7 +7924,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       {this.state.selectedProfile.website && (
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                            <span className="text-purple-600 text-sm">ðŸŒ</span>
+                            <span className="text-purple-600 text-sm">🌐</span>
                           </div>
                           <span className="text-gray-700">{this.state.selectedProfile.website}</span>
                         </div>
@@ -8185,14 +7939,14 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-                            <span className="text-purple-600 text-sm">ðŸ¢</span>
+                            <span className="text-purple-600 text-sm">🏢</span>
                           </div>
                           <span className="text-gray-700">{this.state.selectedProfile.name}</span>
                         </div>
                         {this.state.selectedProfile.description && (
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                              <span className="text-blue-600 text-sm">ðŸ“</span>
+                              <span className="text-blue-600 text-sm">📝</span>
                             </div>
                             <span className="text-gray-700">{this.state.selectedProfile.description}</span>
                           </div>
@@ -8210,7 +7964,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="text-center">
                         <div className="text-2xl font-bold text-green-600">
-                          {this.state.selectedProfile.position === 'Tournament Director' ? 'ðŸ¢' : 
+                          {this.state.selectedProfile.position === 'Tournament Director' ? '🏢' : 
                            this.state.selectedProfile.position || this.state.selectedProfile.finalPosition ? (this.state.selectedProfile.position || this.state.selectedProfile.finalPosition || this.state.selectedProfile.id) :
                            this.state.selectedProfile.id}
                         </div>
@@ -8384,30 +8138,27 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                 </button>
               </div>
             </div>
-
       {/* Modal Content */}
       <div className="p-6">
         {/* Custom Name Input */}
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Round Title
-                </label>
-                <input
-                  type="text"
+          </label>
+          <input
+            type="text"
             value={this.state.selectedRoundDisplayName}
             onChange={(e) => this.setState({ selectedRoundDisplayName: e.target.value })}
             placeholder="Enter custom round name..."
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
-
         {/* Round Categories */}
         <div className="space-y-6">
           {/* Regular Rounds */}
           <div>
             <h4 className="text-sm font-semibold text-gray-800 mb-3">Regular Rounds</h4>
             <div className="grid grid-cols-2 gap-2">
-              {/* Debug: Always show First Round for testing */}
               {!this.state.usedRoundNames.includes('First Round') && (
                 <button onClick={() => this.setState({ selectedRoundDisplayName: 'First Round' })} className="p-3 text-left border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors">
                   <div className="font-medium text-gray-900">First Round</div>
@@ -8468,18 +8219,18 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                   <div className="text-xs text-gray-500">Tenth tournament round</div>
                 </button>
               )}
-                           </div>
-                         </div>
-                       
-                       {/* Final Rounds */}
-                         <div>
+            </div>
+          </div>
+
+          {/* Final Rounds */}
+          <div>
             <h4 className="text-sm font-semibold text-gray-800 mb-3">Final Rounds</h4>
             <div className="grid grid-cols-2 gap-2">
               {!this.state.usedRoundNames.includes('Round of 32') && (
                 <button onClick={() => this.setState({ selectedRoundDisplayName: 'Round of 32' })} className="p-3 text-left border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-300 transition-colors">
                   <div className="font-medium text-gray-900">Round of 32</div>
                   <div className="text-xs text-gray-500">32 players remaining</div>
-                               </button>
+                </button>
               )}
               {!this.state.usedRoundNames.includes('Round of 16') && (
                 <button onClick={() => this.setState({ selectedRoundDisplayName: 'Round of 16' })} className="p-3 text-left border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-300 transition-colors">
@@ -8516,143 +8267,25 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                   <div className="font-medium text-gray-900">Grand Final</div>
                   <div className="text-xs text-gray-500">Ultimate championship</div>
                 </button>
-                       )}
-                           </div>
-                         </div>
-        </div>
+              )}
             </div>
+          </div>
+        </div>
+      </div>
 
-            {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
+      {/* Modal Footer */}
+      <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
         <button onClick={() => this.setState({ showRoundNameModal: false, selectedRoundDisplayName: '' })} className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors">
           Cancel
         </button>
         <button onClick={this.handleCreateRoundFromModal} className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg transition-colors">
           Create Round
         </button>
-            </div>
-          </div>
-                         </div>
-                       )}
+      </div>
+    </div>
+  </div>
+)
 
-      {/* Odd Number Alert Modal */}
-      {this.state.showOddNumberAlert && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                     </div>
-                <h3 className="text-xl font-bold text-gray-900">Invalid Player Move</h3>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="px-6 py-6">
-              <div className="text-gray-700 whitespace-pre-line leading-relaxed">
-                {this.state.oddNumberAlertMessage}
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
-                               <button
-                onClick={() => this.setState({ showOddNumberAlert: false, oddNumberAlertMessage: '' })} 
-                className="px-6 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors font-medium"
-                               >
-                I Understand
-                               </button>
-            </div>
-                           </div>
-                         </div>
-                       )}
-                       
-      {/* Winner Selection Modal */}
-      {this.state.showWinnerSelectionModal && (
-  <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-<div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 transform transition-all">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                         </div>
-                <h3 className="text-xl font-bold text-gray-900">
-                  {(() => {
-                    const selectedMatch = this.state.rounds
-                      .flatMap(round => round.matches)
-                      .find(match => match.id === this.state.selectedMatchForWinner);
-                    return selectedMatch?.winner ? 'Change Match Winner' : 'Select Match Winner';
-                  })()}
-                </h3>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="px-6 py-6">
-              <p className="text-gray-700 mb-4">
-                {(() => {
-                  const selectedMatch = this.state.rounds
-                    .flatMap(round => round.matches)
-                    .find(match => match.id === this.state.selectedMatchForWinner);
-                  return selectedMatch?.winner 
-                    ? `Current winner: ${selectedMatch.winner.name}. Choose the new winner:`
-                    : 'Choose the winner of this match:';
-                })()}
-              </p>
-              {this.state.selectedMatchForWinner && (() => {
-                const selectedMatch = this.state.rounds
-                  .flatMap(round => round.matches)
-                  .find(match => match.id === this.state.selectedMatchForWinner);
-                
-                if (!selectedMatch) return null;
-                
-                   return (
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => this.selectWinner(selectedMatch.player1)}
-                      className="w-full p-4 border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-300 transition-colors text-left"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-600">
-                            {selectedMatch.player1.name.charAt(0).toUpperCase()}
-                          </span>
-              </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{selectedMatch.player1.name}</p>
-                          <p className="text-sm text-gray-500">{selectedMatch.player1.skill}</p>
-                        </div>
-                      </div>
-                    </button>
-                    
-                    <div className="text-center text-gray-500 font-medium">VS</div>
-                    
-                               <button
-                      onClick={() => this.selectWinner(selectedMatch.player2)}
-                      className="w-full p-4 border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-300 transition-colors text-left"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-600">
-                            {selectedMatch.player2.name.charAt(0).toUpperCase()}
-                          </span>
-                        </div>
-                        <div>
-                          <p className="font-medium text-gray-900">{selectedMatch.player2.name}</p>
-                          <p className="text-sm text-gray-500">{selectedMatch.player2.skill}</p>
-                        </div>
-                      </div>
-                               </button>
-                     </div>
-                   );
-                 })()}
             </div>
 
             {/* Modal Footer */}
@@ -8752,7 +8385,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
 
       {/* Set Winner Titles Modal */}
       {/* Set Winner Titles Modal */}
-{/* Set Winner Titles Modal */}
 {this.state.showSetWinnerTitles && (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
     <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto transform transition-all">
@@ -8947,7 +8579,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                        )}
         </div>
       </div>
-
       {/* Modal Footer */}
       <div className="sticky bottom-0 bg-gray-50 px-8 py-4 border-t border-gray-200 rounded-b-2xl flex justify-between items-center">
         <button
@@ -9142,7 +8773,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           </div>
                         )}
                       </div>
-
                       {/* Winners Section */}
                       {round.winners && round.winners.length > 0 && (
                         <div className="mt-6 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 rounded-lg border-2 border-yellow-400">
@@ -9489,7 +9119,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
         ))}
       </nav>
     </div>
-    
 {/* Tab Content */}
 <div className="mt-6 bg-white rounded-lg shadow-md p-6">
   {(() => {
@@ -9656,7 +9285,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                            </div>
                          </div>
                        )}
-                       
               {/* Winner Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {activeRound.winners.map((winner: Player, index: number) => (
@@ -9723,111 +9351,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                        )}
                      </div>
                    );
-    }
-    
-    // Check if we're viewing the losers tab
-    const isLosersTab = this.state.activeRoundSubTab[activeRound.id] === 'losers';
-    
-    if (isLosersTab) {
-      // Losers Tab Content
-      return (
-        <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-lg p-6 border border-red-200">
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center space-x-3">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <svg className="w-6 h-6 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-xl font-semibold text-red-800">
-                  {activeRound.displayName || activeRound.name} Losers
-                </h3>
-                <p className="text-sm text-red-600">Players who lost in this round (can advance with mutual agreement)</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              {/* Close Button for Empty Rounds */}
-             
-             
-
-
-
-
-              
-              <span className="px-4 py-2 bg-red-500 text-white rounded-full text-sm font-medium shadow-sm">
-                {activeRound.losers?.length || 0} Loser{(activeRound.losers?.length || 0) !== 1 ? 's' : ''}
-              </span>
-            </div>
-          </div>
-          
-          {(!activeRound.losers || activeRound.losers.length === 0) ? (
-            <div className="text-center py-12">
-              <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Losers Yet</h3>
-              <p className="text-gray-500">Losers will appear here once matches are completed.</p>
-            </div>
-          ) : (
-            <div>
-              {/* Move Controls for Losers */}
-              {activeRound.losers.filter(l => l.selected).length > 0 && (
-                <div className="mb-6 p-4 bg-red-100 rounded-lg border border-red-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
-                      <span className="text-red-800 font-medium">
-                        {activeRound.losers.filter(l => l.selected).length} loser{activeRound.losers.filter(l => l.selected).length !== 1 ? 's' : ''} selected
-                      </span>
-                      <select
-                        className="px-3 py-2 border border-red-300 rounded text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                        onChange={(e) => this.setState({ selectedRoundId: e.target.value })}
-                        value={this.state.selectedRoundId || 'dashboard'}
-                      >
-                        <option value="dashboard">← Back to Tournament Dashboard</option>
-                        {/* Show next rounds for advancement */}
-                        {/* Show next rounds for advancement */}
-
-{/* Show ALL future rounds for advancement (not just immediate next) */}
-{this.state.rounds
-  .filter(targetRound => {
-    // Never allow movement to the same round
-    if (targetRound.id === activeRound.id) return false;
-    
-    const currentRoundIndex = this.state.rounds.findIndex(r => r.id === activeRound.id);
-    const targetRoundIndex = this.state.rounds.findIndex(r => r.id === targetRound.id);
-    
-    // Check if current round has any completed matches
-    const currentRoundHasCompletedMatches = activeRound.matches && 
-      activeRound.matches.length > 0 && 
-      activeRound.matches.some(match => match.status === 'completed');
-    
-    const isMovingForward = targetRoundIndex > currentRoundIndex;
-    
-    // Allow advancement to ANY future round if current round has completed matches
-    if (isMovingForward) {
-      return currentRoundHasCompletedMatches;
-    }
-    
-    return false;
-  })
-  .map((targetRound) => {
-    const hasCompletedMatches = targetRound.matches && 
-      targetRound.matches.length > 0 && 
-      targetRound.matches.some(match => match.status === 'completed');
-    const isEmpty = targetRound.players.length === 0 && 
-      targetRound.winners.length === 0 && 
-      !hasCompletedMatches;
-    const isEmptyText = isEmpty ? " (Empty)" : "";
-    
-    return (
-      <option key={targetRound.id} value={targetRound.id}>
-        → Advance to {targetRound.displayName || targetRound.name}{isEmptyText}
-      </option>
-    );
-  })}
-
-  
                       </select>
                       <button
                         onClick={() => this.moveSelectedLosersToDestination(activeRound.id)}
@@ -9998,7 +9521,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
   // Determine button label and styling
   const isStartMatch = unmatchedCount === 2;
   const buttonLabel = isStartMatch ? 'Start Match' : 'Shuffle';
-  
   // Only show button if there are at least 2 players and round is not frozen
   if (activeRound.players.length >= 2 && !activeRound.isFrozen) {
     return (
@@ -10182,7 +9704,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                 </div>
               </div>
             </div>
-            
             {/* Match Control Buttons */}
             <div className="mt-4 pt-4 border-t border-gray-200 flex justify-center space-x-3">
               {match.status === 'pending' && (
@@ -10231,134 +9752,9 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
         ))}
       </div>
     </div>
-    
-    {/* Unmatched Players Section - only show if there are players not in matches */}
-    {(() => {
-      // Get all players who are in matches
-      const matchedPlayerIds = new Set();
-      activeRound.matches.forEach(match => {
-        matchedPlayerIds.add(match.player1.id);
-        matchedPlayerIds.add(match.player2.id);
-      });
-      
-      // Filter out players who are already in matches
-      const unmatchedPlayers = activeRound.players.filter(player => !matchedPlayerIds.has(player.id));
-      
-      if (unmatchedPlayers.length > 0) {
-        return (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-lg font-semibold text-gray-800">Unmatched Players</h4>
-              <span className="px-3 py-1 bg-orange-100 text-orange-800 rounded-full text-sm">
-                {unmatchedPlayers.length} players waiting
-              </span>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {unmatchedPlayers.map((player) => (
-                <div 
-                  key={player.id} 
-                  onClick={() => {
-                    if (!activeRound.isFrozen) {
-                      const roundIndex = this.state.rounds.findIndex(r => r.id === activeRound.id);
-                      if (roundIndex !== -1) {
-                        this.togglePlayerSelection(player, roundIndex);
-                      }
-                    }
-                  }}
-                  className={`flex items-center space-x-3 p-3 border rounded-lg transition-all ${
-                    activeRound.isFrozen 
-                      ? 'cursor-not-allowed opacity-60' 
-                      : player.selected 
-                        ? 'bg-blue-50 border-blue-300 shadow-md cursor-pointer' 
-                        : 'hover:bg-gray-50 hover:border-gray-300 cursor-pointer'
-                  }`}
-                >
-                  <div className={`w-5 h-5 border-2 rounded flex items-center justify-center ${
-                    player.selected 
-                      ? 'bg-blue-500 border-blue-500' 
-                      : 'border-gray-300 hover:border-blue-400'
-                  }`}>
-                    {player.selected && (
-                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                  <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
-                    {player.profilePic ? (
-                      <img 
-                        src={player.profilePic} 
-                        alt={player.name}
-                        className="w-full h-full object-cover rounded-full"
-                      />
-                    ) : (
-                      <span className="text-sm font-medium text-gray-600">
-                        {player.name.charAt(0).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{player.name}</p>
-                    <p className="text-xs text-gray-500">{player.skill}</p>
-                    {player.isPreviousRoundWinner && player.originalWinnerRoundId && (() => {
-                      const winningRound = this.state.rounds.find(r => r.id === player.originalWinnerRoundId);
-                      return winningRound ? (
-                        <p className="text-xs text-green-600 font-medium mt-1">
-                          🏆 Winner from {winningRound.displayName || winningRound.name}
-                        </p>
-                      ) : null;
-                    })()}
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            {/* Move Controls for Unmatched Players */}
-            {unmatchedPlayers.some(p => p.selected) && !activeRound.isFrozen && (
-              <div className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <label className="text-sm font-medium text-gray-700">Move selected to:</label>
-                  <select
-                    value={this.state.selectedRoundId || 'dashboard'}
-                    onChange={(e) => this.setState({ selectedRoundId: e.target.value })}
-                    className="flex-1 min-w-[200px] px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="dashboard">← Tournament Dashboard</option>
-                    {this.state.rounds
-                      .filter(r => r.id !== activeRound.id)
-                      .map(r => (
-                      <option key={r.id} value={r.id}>
-                        {r.displayName || r.name} ({r.players.length} players)
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => this.moveSelectedPlayersFromRound(activeRound.id)}
-                    disabled={!this.state.selectedRoundId}
-                    className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Move
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-blue-800 text-sm">
-                💡 <strong>Tip:</strong> Select unmatched players and click "Shuffle" to create new matches while preserving completed matches.
-              </p>
-            </div>
-          </div>
-        );
-      }
-      return null;
-    })()}
   </div>
 ) : activeRound.players.length > 0 ? (
   /* Show Individual Players (when no matches exist yet) */
-  <div className="space-y-4">
-   
-   /* Show Individual Players (when no matches exist yet) */
   <div className="space-y-4">
     <div className="flex items-center justify-between mb-4">
       <h4 className="text-lg font-semibold text-gray-800">Players in Round</h4>
@@ -10393,7 +9789,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
         </button>
       </div>
     </div>
-
     {/* Player Grid */}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {activeRound.players.map((player) => (
@@ -10446,9 +9841,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
         </div>
       ))}
     </div>
-  </div>
-
-  
   </div>
 ) : (
   /* No players and no matches */

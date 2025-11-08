@@ -349,38 +349,26 @@ class MatchesApiService {
     }
   }
 
-  // Get Tournament Players API (NEW - Token-based)
-  // POST /api/v1/organizers/tournaments/{tournament_id}/players
-  // Token is passed in request body as per Postman collection
+  // Get Tournament API (includes registered players and tournament status)
+  // GET /api/v1/organizers/tournaments/{tournament_id}
+  // Token is passed in Authorization header as Bearer token
   async getTournamentPlayers(tournamentId: string): Promise<any> {
     try {
-      console.log('👥 Calling NEW token-based tournament players API');
+      console.log('🏆 Calling Get Tournament API (includes registered players)');
       console.log('🌐 API Base URL:', this.apiBaseUrl);
       console.log('🏆 Tournament ID:', tournamentId);
       
-      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/players`;
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}`;
       console.log('📍 Full API URL:', url);
-      console.log('🔐 Request method: POST');
+      console.log('🔐 Request method: GET');
+      console.log('🔐 Using Authorization Bearer token from authService');
       
-      // Get token from authService
-      //const authService = (await import('./authService')).default;
-      const token = authService.getAccessToken();
-      
-      if (!token) {
-        throw new Error('No authentication token found. Please login first.');
-      }
-      
-      console.log('🔐 Token found, including in request body');
-      
-      // According to Postman collection, token is passed in request body
-      const response = await fetch(url, {
-        method: 'POST',
+      // Use authenticated request helper which handles Authorization header
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          token: token
-        })
       });
 
       console.log('📥 Response status:', response.status);
@@ -412,12 +400,16 @@ class MatchesApiService {
       }
 
       const data = await response.json();
-      console.log('✅ Tournament players API response received');
+      console.log('✅ Tournament API response received');
       console.log('📦 Response structure:', {
         success: data.success,
         hasData: !!data.data,
         playerCount: data.data?.count || 0,
-        hasPlayers: !!(data.data?.players && Array.isArray(data.data.players))
+        hasPlayers: !!(data.data?.players && Array.isArray(data.data.players)),
+        hasTournamentStatus: !!(data.data?.tournament_status),
+        tournament: data.data?.tournament_status?.tournament,
+        rounds: data.data?.tournament_status?.rounds,
+
       });
       
       return data;
@@ -469,6 +461,77 @@ class MatchesApiService {
           count: 0
         }
       };
+    }
+  }
+
+  // Create Round API
+  // POST /api/v1/organizers/tournaments/{tournament_id}/rounds
+  // Requires Authorization Bearer token in header
+  async createRound(tournamentId: string, roundData: {
+    roundNumber: number;
+    roundName?: string;
+    roundDisplayName?: string;
+    status?: 'pending' | 'active' | 'completed';
+    isFreezed?: boolean;
+  }): Promise<any> {
+    try {
+      console.log('🎯 Calling create round API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      console.log('📋 Round Data:', roundData);
+      
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/rounds`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: POST');
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(roundData),
+      });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        console.log('❌ Unauthorized request (401), token expired or invalid');
+        console.log('🔐 Logging out user and redirecting to login page...');
+        authService.logout();
+        window.location.href = '/login';
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+        
+        // Try to parse error as JSON
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Round created successfully');
+      console.log('📦 Response data:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Create round API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      throw error;
     }
   }
 
