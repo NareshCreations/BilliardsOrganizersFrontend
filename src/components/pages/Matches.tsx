@@ -1287,24 +1287,88 @@ selectedRoundDisplayName: '',
       if (shouldGoToDashboard) {
         // Go directly to tournament dashboard
         console.log('🎮 Status is started/running/completed - going directly to dashboard');
-        
+
+        // Extract tournament data from API response
+        const apiTournament = playersResponse.data?.tournament_status?.tournament;
+        const apiRounds = playersResponse.data?.tournament_status?.rounds || [];
+
         // Convert tournamentId string to number for Match interface compatibility
         const tournamentIdNumber = tournamentId.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-        
+
+        // Map API rounds data to TournamentRound interface
+        const mappedRounds: TournamentRound[] = apiRounds.map((round: any) => ({
+          id: round.id || round.roundId || `round-${round.roundNumber || 1}`,
+          name: round.name || round.roundName || `Round ${round.roundNumber || 1}`,
+          displayName: round.displayName || round.roundDisplayName,
+          players: (round.players || []).map((player: any) => ({
+            id: player.id?.toString() || player.playerId?.toString() || '',
+            name: player.name || player.fullName || '',
+            email: player.email || '',
+            skill: player.skillLevel || player.skill || 'Beginner',
+            profilePic: player.profilePic || player.avatar || '',
+            selected: false,
+            status: (player.status as Player['status']) || 'available',
+            currentRound: round.id || round.roundId,
+            currentMatch: player.currentMatch || null,
+            matchesPlayed: player.matchesPlayed || 0,
+            isPreviousRoundWinner: player.isPreviousRoundWinner || false,
+            originalWinnerRoundId: player.originalWinnerRoundId || null,
+            previousWinningRoundId: player.previousWinningRoundId || null,
+            lastWinningRound: player.lastWinningRound || null,
+            lastRoundPlayedNumber: player.lastRoundPlayedNumber || null,
+            roundsWon: player.roundsWon || []
+          })),
+          matches: (round.matches || []).map((match: any) => ({
+            id: match.id || match.matchId || '',
+            player1: match.player1 || match.players?.[0],
+            player2: match.player2 || match.players?.[1],
+            status: (match.status as TournamentMatch['status']) || 'pending',
+            startTime: match.startTime,
+            endTime: match.endTime,
+            duration: match.duration,
+            score: match.score,
+            winner: match.winner
+          })),
+          winners: (round.winners || []).map((winner: any) => ({
+            id: winner.id?.toString() || winner.playerId?.toString() || '',
+            name: winner.name || winner.fullName || '',
+            email: winner.email || '',
+            skill: winner.skillLevel || winner.skill || 'Beginner',
+            profilePic: winner.profilePic || winner.avatar || '',
+            selected: false,
+            status: 'available' as const,
+            currentRound: null,
+            currentMatch: null
+          })),
+          losers: (round.losers || []).map((loser: any) => ({
+            id: loser.id?.toString() || loser.playerId?.toString() || '',
+            name: loser.name || loser.fullName || '',
+            email: loser.email || '',
+            skill: loser.skillLevel || loser.skill || 'Beginner',
+            profilePic: loser.profilePic || loser.avatar || '',
+            selected: false,
+            status: 'available' as const,
+            currentRound: null,
+            currentMatch: null
+          })),
+          status: (round.status as TournamentRound['status']) || 'pending',
+          isFrozen: round.isFrozen || round.isFreezed || false
+        }));
+
         const tournamentData: TournamentDashboard = {
           id: tournamentIdNumber,
-          name: tournamentName,
-          gameType: '9-ball', // Default, can be updated from API if needed
-          organizerName: 'Tournament Organizer',
-          organizerDescription: 'Professional tournament management',
-          date: new Date('2025-10-15T14:00:00').toISOString(),
-          time: new Date('2025-10-15T14:00:00').toLocaleTimeString(),
-          status: 'active',
+          name: apiTournament?.name || tournamentName,
+          gameType: apiTournament?.gameType || '9-ball',
+          organizerName: apiTournament?.organizer?.name || 'Tournament Organizer',
+          organizerDescription: apiTournament?.description || 'Professional tournament management',
+          date: apiTournament?.startDate ? new Date(apiTournament.startDate).toISOString() : new Date('2025-10-15T14:00:00').toISOString(),
+          time: apiTournament?.startDate ? new Date(apiTournament.startDate).toLocaleTimeString() : new Date('2025-10-15T14:00:00').toLocaleTimeString(),
+          status: apiTournament?.status || 'active',
           players: currentParticipants,
-          maxPlayers: 50,
-          entryFee: 50,
-          venue: 'Delhi Sports Complex - Main Branch',
-          ballRules: 'Standard tournament rules',
+          maxPlayers: apiTournament?.maxParticipants || 50,
+          entryFee: apiTournament?.entryFee || 50,
+          venue: apiTournament?.venue || 'Delhi Sports Complex - Main Branch',
+          ballRules: apiTournament?.rules || 'Standard tournament rules',
           allPlayers: registeredPlayers.map((player: any) => ({
             id: player.id.toString(),
             name: player.name,
@@ -1316,8 +1380,8 @@ selectedRoundDisplayName: '',
             currentRound: null,
             currentMatch: null
           })),
-          rounds: [],
-          currentRound: null,
+          rounds: mappedRounds,
+          currentRound: mappedRounds.length > 0 ? mappedRounds[0].id : null,
           tournamentStarted: true,
           registeredPlayers: registeredPlayers,
           tournamentId: tournamentId // Store original tournament ID string for API calls
