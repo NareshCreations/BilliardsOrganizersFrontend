@@ -3,10 +3,12 @@
  * Handles login, token management, and authentication state
  */
 
+import { AUTH_CONFIG, IdentifierType } from '../config/auth';
+
 export interface LoginCredentials {
   identifier: string;
   password: string;
-  identifierType: 'org_id' | 'email' | 'phone';
+  identifierType: IdentifierType;
 }
 
 export interface User {
@@ -62,12 +64,11 @@ export interface TokenVerificationResponse {
 }
 
 class AuthService {
-  // Default to port 3005 as per Postman collection, but allow override via env variable
-  private readonly API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3005/api/v1';
-  private readonly TOKEN_KEY = 'billiards_auth_token';
-  private readonly REFRESH_TOKEN_KEY = 'billiards_refresh_token';
-  private readonly USER_KEY = 'billiards_user';
-  private readonly TOKEN_EXPIRY_KEY = 'billiards_token_expiry';
+  private readonly API_BASE_URL = AUTH_CONFIG.API_BASE_URL;
+  private readonly TOKEN_KEY = AUTH_CONFIG.TOKEN_KEY;
+  private readonly REFRESH_TOKEN_KEY = AUTH_CONFIG.REFRESH_TOKEN_KEY;
+  private readonly USER_KEY = AUTH_CONFIG.USER_KEY;
+  private readonly TOKEN_EXPIRY_KEY = AUTH_CONFIG.TOKEN_EXPIRY_KEY;
 
   /**
    * Production-grade login with comprehensive error handling
@@ -208,7 +209,23 @@ Default expected URL: http://localhost:3002/api/v1`;
       // but log the issue for debugging
       if (error instanceof TypeError && error.message.includes('fetch')) {
         console.log('⚠️ Network error during token verification, assuming token is valid');
-        return { success: true, message: 'Token verification skipped due to network error' };
+        return {
+          success: true,
+          message: 'Token verification skipped due to network error',
+          data: {
+            user: {
+              id: '',
+              identifier: '',
+              identifier_type: 'email',
+              user_type: 'customer',
+              isActive: false,
+              isVerified: false,
+              lastLogin: '',
+              createdAt: ''
+            },
+            isValid: true
+          }
+        };
       }
       
       throw error;
@@ -427,6 +444,20 @@ Default expected URL: http://localhost:3002/api/v1`;
     } catch (error) {
       console.error('❌ Token refresh error:', error);
       return false;
+    }
+  }
+
+  /**
+   * Set tokens (used for token refresh)
+   */
+  private setTokens(tokens: AuthTokens): void {
+    try {
+      localStorage.setItem(this.TOKEN_KEY, tokens.accessToken);
+      localStorage.setItem(this.REFRESH_TOKEN_KEY, tokens.refreshToken);
+      localStorage.setItem(this.TOKEN_EXPIRY_KEY, tokens.expiresAt);
+      console.log('✅ Tokens updated successfully');
+    } catch (error) {
+      console.error('❌ Failed to set tokens:', error);
     }
   }
 

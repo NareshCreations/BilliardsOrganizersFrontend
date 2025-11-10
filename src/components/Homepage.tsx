@@ -56,7 +56,7 @@ export class Homepage extends BaseComponentComplete<HomepageProps, HomepageState
    */
   private handleSignIn = (): void => {
     this.log('Sign in clicked');
-    // Navigate to organizer login page
+    // Force full page reload to ensure clean navigation to login
     window.location.href = '/login';
   };
 

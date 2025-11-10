@@ -30,8 +30,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallback }) =
   }
 
   if (!isAuthenticated) {
-    console.log('🛡️ ProtectedRoute: User not authenticated, showing login');
-    return fallback || <Login />;
+    console.log('🛡️ ProtectedRoute: User not authenticated, redirecting to login');
+    // Force full page reload to clear all state and redirect to login
+    window.location.href = '/login';
+    return null;
   }
 
   console.log('🛡️ ProtectedRoute: User authenticated, showing protected content');
