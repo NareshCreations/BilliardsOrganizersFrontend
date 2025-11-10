@@ -41,8 +41,8 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onLoginError }) => {
   // Redirect when authentication state changes
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      console.log('✅ User authenticated, redirecting to matches...');
-      navigate('/matches');
+      console.log('✅ User authenticated, redirecting to dashboard...');
+      navigate('/dashboard');
     }
   }, [isAuthenticated, isLoading, navigate]);
 
