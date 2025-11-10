@@ -44,5 +44,11 @@
     "typescript": "^5.2.2",
     "vite": "^5.0.8",
     "vitest": "^1.0.4"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-darwin-x64": "^4.53.1",
+    "@rollup/rollup-linux-arm64-gnu": "^4.53.1",
+    "@rollup/rollup-linux-x64-gnu": "^4.53.1",
+    "@rollup/rollup-win32-x64-msvc": "^4.53.1"
   }
 }
