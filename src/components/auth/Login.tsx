@@ -39,12 +39,37 @@ const Login: React.FC<LoginProps> = ({ onLoginSuccess, onLoginError }) => {
     }
   }, [formData]);
 
-  // Redirect when authentication state changes (only for new logins, not for already authenticated users)
+  // Redirect already authenticated users immediately (standard behavior)
   useEffect(() => {
-    // Only redirect if we just completed a login (user exists and we were loading)
-    if (isAuthenticated && !isLoading && user && !isSubmitting) {
-      console.log('✅ User just logged in, redirecting to dashboard...');
-      navigate('/dashboard');
+    if (isAuthenticated && !isLoading && user) {
+      console.log('🔄 Login: User already authenticated, redirecting to dashboard...');
+      // Check if there's a stored redirect URL from ProtectedRoute
+      const redirectUrl = localStorage.getItem('redirectAfterLogin');
+      if (redirectUrl) {
+        localStorage.removeItem('redirectAfterLogin'); // Clear the stored URL
+        console.log('✅ Redirecting to intended page:', redirectUrl);
+        navigate(redirectUrl);
+      } else {
+        console.log('✅ Redirecting to dashboard...');
+        navigate('/dashboard');
+      }
+    }
+  }, [isAuthenticated, isLoading, navigate, user]);
+
+  // Redirect when authentication state changes (only for new logins)
+  useEffect(() => {
+    // Only redirect if we just completed a login (user exists and we were submitting)
+    if (isAuthenticated && !isLoading && user && isSubmitting) {
+      // Check if there's a stored redirect URL
+      const redirectUrl = localStorage.getItem('redirectAfterLogin');
+      if (redirectUrl) {
+        localStorage.removeItem('redirectAfterLogin'); // Clear the stored URL
+        console.log('✅ User just logged in, redirecting to intended page:', redirectUrl);
+        navigate(redirectUrl);
+      } else {
+        console.log('✅ User just logged in, redirecting to dashboard...');
+        navigate('/dashboard');
+      }
     }
   }, [isAuthenticated, isLoading, navigate, user, isSubmitting]);
 

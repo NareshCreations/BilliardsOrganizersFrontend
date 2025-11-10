@@ -3,7 +3,17 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import styles from './Header.module.scss';
 
-const DashboardHeader: React.FC = () => {
+interface DashboardHeaderProps {
+  variant?: 'landing' | 'dashboard';
+  onSectionChange?: (section: 'dashboard' | 'tournaments' | 'players' | 'live-games') => void;
+  activeSection?: string;
+}
+
+const DashboardHeader: React.FC<DashboardHeaderProps> = ({
+  variant = 'landing',
+  onSectionChange,
+  activeSection = ''
+}) => {
   const navigate = useNavigate();
   const { logout } = useAuth();
 

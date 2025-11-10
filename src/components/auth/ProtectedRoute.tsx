@@ -31,6 +31,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallback }) =
 
   if (!isAuthenticated) {
     console.log('🛡️ ProtectedRoute: User not authenticated, redirecting to login');
+    // Store the intended URL for redirect after login
+    const currentPath = window.location.pathname + window.location.search;
+    if (currentPath !== '/login') {
+      localStorage.setItem('redirectAfterLogin', currentPath);
+      console.log('🛡️ ProtectedRoute: Stored redirect URL:', currentPath);
+    }
     // Force full page reload to clear all state and redirect to login
     window.location.href = '/login';
     return null;

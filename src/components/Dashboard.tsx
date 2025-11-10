@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { OrganizerHeader } from './organisms/OrganizerHeader/OrganizerHeader';
+import DashboardHeader from './Header/DashboardHeader';
 import { DashboardOverview } from './organisms/DashboardOverview/DashboardOverview';
 import { TournamentManagement } from './organisms/TournamentManagement/TournamentManagement';
 import { PlayerManagement } from './organisms/PlayerManagement/PlayerManagement';
@@ -17,6 +18,7 @@ export interface DashboardProps {
     role: string;
     organization: string;
   };
+  headerVariant?: 'organizer' | 'dashboard';
 }
 
 /**
@@ -28,6 +30,7 @@ const OrganizerDashboard: React.FC<DashboardProps> = (props) => {
 
   const [activeSection, setActiveSection] = useState<'dashboard' | 'tournaments' | 'players' | 'live-games'>('dashboard');
   const [isLoading, setIsLoading] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [notifications, setNotifications] = useState<Array<{
     id: string;
     message: string;
@@ -47,6 +50,43 @@ const OrganizerDashboard: React.FC<DashboardProps> = (props) => {
       timestamp: new Date()
     }
   ]);
+
+  // Handle online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('🌐 Dashboard: Connection restored');
+      setIsOnline(true);
+      // Add a notification when coming back online
+      const onlineNotification = {
+        id: `online-${Date.now()}`,
+        message: 'Connection restored - you are back online',
+        type: 'success' as const,
+        timestamp: new Date()
+      };
+      setNotifications(prev => [onlineNotification, ...prev]);
+    };
+
+    const handleOffline = () => {
+      console.log('🚫 Dashboard: Connection lost');
+      setIsOnline(false);
+      // Add a notification when going offline
+      const offlineNotification = {
+        id: `offline-${Date.now()}`,
+        message: 'Connection lost - working in offline mode',
+        type: 'warning' as const,
+        timestamp: new Date()
+      };
+      setNotifications(prev => [offlineNotification, ...prev]);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   /**
    * Handle logout
@@ -176,7 +216,15 @@ const OrganizerDashboard: React.FC<DashboardProps> = (props) => {
 
   return (
     <div className={styles.organizerHome}>
-      <OrganizerHeader onLogout={handleLogout} />
+      {props.headerVariant === 'dashboard' ? (
+        <DashboardHeader
+          variant="dashboard"
+          onSectionChange={handleSectionChange}
+          activeSection={activeSection}
+        />
+      ) : (
+        <OrganizerHeader onLogout={handleLogout} />
+      )}
 
       <div className={styles.mainLayout}>
         {renderNavigationSidebar()}
@@ -190,6 +238,15 @@ const OrganizerDashboard: React.FC<DashboardProps> = (props) => {
               {activeSection === 'live-games' && 'Live Game Control'}
             </h1>
             <div className={styles.contentActions}>
+              {/* Online/Offline Status Indicator */}
+              <div className={`${styles.connectionStatus} ${isOnline ? styles.online : styles.offline}`}>
+                <div className={styles.statusIndicator}>
+                  <span className={styles.statusDot}></span>
+                  <span className={styles.statusText}>
+                    {isOnline ? 'Online' : 'Offline'}
+                  </span>
+                </div>
+              </div>
               {renderNotificationsPanel()}
             </div>
           </div>
