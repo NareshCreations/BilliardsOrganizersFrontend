@@ -1218,6 +1218,8 @@ selectedRoundDisplayName: '',
       // Fetch registered players
       const playersResponse = await matchesApiService.getTournamentPlayers(tournamentId);
       
+      console.log("playersResponse", playersResponse);
+      console.log("playersResponse.data.tournament_status.rounds", playersResponse.data.tournament_status.rounds);
       console.log('👥 API call completed, response received');
       console.log('👥 Response success:', playersResponse.success);
       console.log('👥 Response message:', playersResponse.message);
@@ -1287,88 +1289,606 @@ selectedRoundDisplayName: '',
       if (shouldGoToDashboard) {
         // Go directly to tournament dashboard
         console.log('🎮 Status is started/running/completed - going directly to dashboard');
-
-        // Extract tournament data from API response
-        const apiTournament = playersResponse.data?.tournament_status?.tournament;
-        const apiRounds = playersResponse.data?.tournament_status?.rounds || [];
-
+        
         // Convert tournamentId string to number for Match interface compatibility
         const tournamentIdNumber = tournamentId.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-
-        // Map API rounds data to TournamentRound interface
-        const mappedRounds: TournamentRound[] = apiRounds.map((round: any) => ({
-          id: round.id || round.roundId || `round-${round.roundNumber || 1}`,
-          name: round.name || round.roundName || `Round ${round.roundNumber || 1}`,
-          displayName: round.displayName || round.roundDisplayName,
-          players: (round.players || []).map((player: any) => ({
-            id: player.id?.toString() || player.playerId?.toString() || '',
-            name: player.name || player.fullName || '',
-            email: player.email || '',
-            skill: player.skillLevel || player.skill || 'Beginner',
-            profilePic: player.profilePic || player.avatar || '',
-            selected: false,
-            status: (player.status as Player['status']) || 'available',
-            currentRound: round.id || round.roundId,
-            currentMatch: player.currentMatch || null,
-            matchesPlayed: player.matchesPlayed || 0,
-            isPreviousRoundWinner: player.isPreviousRoundWinner || false,
-            originalWinnerRoundId: player.originalWinnerRoundId || null,
-            previousWinningRoundId: player.previousWinningRoundId || null,
-            lastWinningRound: player.lastWinningRound || null,
-            lastRoundPlayedNumber: player.lastRoundPlayedNumber || null,
-            roundsWon: player.roundsWon || []
-          })),
-          matches: (round.matches || []).map((match: any) => ({
-            id: match.id || match.matchId || '',
-            player1: match.player1 || match.players?.[0],
-            player2: match.player2 || match.players?.[1],
-            status: (match.status as TournamentMatch['status']) || 'pending',
-            startTime: match.startTime,
-            endTime: match.endTime,
-            duration: match.duration,
-            score: match.score,
-            winner: match.winner
-          })),
-          winners: (round.winners || []).map((winner: any) => ({
-            id: winner.id?.toString() || winner.playerId?.toString() || '',
-            name: winner.name || winner.fullName || '',
-            email: winner.email || '',
-            skill: winner.skillLevel || winner.skill || 'Beginner',
-            profilePic: winner.profilePic || winner.avatar || '',
-            selected: false,
-            status: 'available' as const,
-            currentRound: null,
-            currentMatch: null
-          })),
-          losers: (round.losers || []).map((loser: any) => ({
-            id: loser.id?.toString() || loser.playerId?.toString() || '',
-            name: loser.name || loser.fullName || '',
-            email: loser.email || '',
-            skill: loser.skillLevel || loser.skill || 'Beginner',
-            profilePic: loser.profilePic || loser.avatar || '',
-            selected: false,
-            status: 'available' as const,
-            currentRound: null,
-            currentMatch: null
-          })),
-          status: (round.status as TournamentRound['status']) || 'pending',
-          isFrozen: round.isFrozen || round.isFreezed || false
-        }));
+       
+        const staticRoundsa: TournamentRound[] = [
+          {
+            id: 'round_final',
+            name: 'Round 1',
+            displayName: 'Championship Round',
+            status: 'completed',
+            isFrozen: true,
+            players: [
+              {
+                id: 'p1',
+                name: 'Arjun Mehta',
+                email: 'arjun.mehta@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=8',
+                selected: false,
+                status: 'winner',
+                currentRound: 'round_final',
+                currentMatch: 'match_final',
+                currentMatch: 'match_final',
+                matchesPlayed: 1,
+                roundsWon: ['round_final'],
+                hasPlayed: true
+              },
+              {
+                id: 'p2',
+                name: 'Rohan Mehta',
+                email: 'rohan.mehta@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=19',
+                selected: false,
+                status: 'eliminated',
+                currentRound: 'round_final',
+                currentMatch: 'match_final',
+                matchesPlayed: 1,
+                roundsWon: [],
+                hasPlayed: true
+              },
+              {
+                id: 'p3',
+                name: 'Tanya Saxena',
+                email: 'tanya.saxena@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=4',
+                selected: false,
+                status: 'winner',
+                currentRound: 'round_final',
+                currentMatch: 'match_bronze',
+                matchesPlayed: 1,
+                roundsWon: ['round_final'],
+                hasPlayed: true
+              },
+              {
+                id: 'p4',
+                name: 'Vikram Singh',
+                email: 'vikram.singh@example.com',
+                skill: 'Intermediate',
+                profilePic: 'https://i.pravatar.cc/150?img=18',
+                selected: false,
+                status: 'eliminated',
+                currentRound: 'round_final',
+                currentMatch: 'match_bronze',
+                matchesPlayed: 1,
+                roundsWon: [],
+                hasPlayed: true
+              }
+            ],
+            matches: [
+              {
+                id: 'match_final',
+                player1: {
+                  id: 'p1',
+                  name: 'Arjun Mehta',
+                  email: 'arjun.mehta@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=8',
+                  selected: false,
+                  status: 'winner',
+                  currentRound: 'round_final',
+                  currentMatch: 'match_final',
+                  matchesPlayed: 1,
+                  roundsWon: ['round_final'],
+                  hasPlayed: true
+                },
+                player2: {
+                  id: 'p2',
+                  name: 'Rohan Mehta',
+                  email: 'rohan.mehta@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=19',
+                  selected: false,
+                  status: 'eliminated',
+                  currentRound: 'round_final',
+                  currentMatch: 'match_final',
+                  matchesPlayed: 1,
+                  roundsWon: [],
+                  hasPlayed: true
+                },
+                status: 'completed',
+                startTime: '2025-11-15T15:00:00.000Z',
+                endTime: '2025-11-15T15:40:00.000Z',
+                duration: '40m',
+                score: '5-3',
+                winner: {
+                  id: 'p1',
+                  name: 'Arjun Mehta',
+                  email: 'arjun.mehta@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=8',
+                  selected: false,
+                  status: 'winner',
+                  currentRound: 'round_final',
+                  currentMatch: 'match_final',
+                  matchesPlayed: 1,
+                  roundsWon: ['round_final'],
+                  hasPlayed: true
+                }
+              },
+              {
+                id: 'match_bronze',
+                player1: {
+                  id: 'p3',
+                  name: 'Tanya Saxena',
+                  email: 'tanya.saxena@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=4',
+                  selected: false,
+                  status: 'winner',
+                  currentRound: 'round_final',
+                  currentMatch: 'match_bronze',
+                  matchesPlayed: 1,
+                  roundsWon: ['round_final'],
+                  hasPlayed: true
+                },
+                player2: {
+                  id: 'p4',
+                  name: 'Vikram Singh',
+                  email: 'vikram.singh@example.com',
+                  skill: 'Intermediate',
+                  profilePic: 'https://i.pravatar.cc/150?img=18',
+                  selected: false,
+                  status: 'eliminated',
+                  currentRound: 'round_final',
+                  currentMatch: 'match_bronze',
+                  matchesPlayed: 1,
+                  roundsWon: [],
+                  hasPlayed: true
+                },
+                status: 'completed',
+                startTime: '2025-11-15T14:00:00.000Z',
+                endTime: '2025-11-15T14:35:00.000Z',
+                duration: '35m',
+                score: '4-2',
+                winner: {
+                  id: 'p3',
+                  name: 'Tanya Saxena',
+                  email: 'tanya.saxena@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=4',
+                  selected: false,
+                  status: 'winner',
+                  currentRound: 'round_final',
+                  currentMatch: 'match_bronze',
+                  matchesPlayed: 1,
+                  roundsWon: ['round_final'],
+                  hasPlayed: true
+                }
+              }
+            ],
+            winners: [
+              {
+                id: 'p1',
+                name: 'Arjun Mehta',
+                email: 'arjun.mehta@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=8',
+                selected: false,
+                status: 'winner',
+                currentRound: 'round_final',
+                currentMatch: null,
+                matchesPlayed: 1,
+                roundsWon: ['round_final'],
+                hasPlayed: true
+              },
+              {
+                id: 'p3',
+                name: 'Tanya Saxena',
+                email: 'tanya.saxena@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=4',
+                selected: false,
+                status: 'winner',
+                currentRound: 'round_final',
+                currentMatch: null,
+                matchesPlayed: 1,
+                roundsWon: ['round_final'],
+                hasPlayed: true
+              }
+            ],
+            losers: [
+              {
+                id: 'p2',
+                name: 'Rohan Mehta',
+                email: 'rohan.mehta@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=19',
+                selected: false,
+                status: 'eliminated',
+                currentRound: 'round_final',
+                currentMatch: null,
+                matchesPlayed: 1,
+                roundsWon: [],
+                hasPlayed: true
+              },
+              {
+                id: 'p4',
+                name: 'Vikram Singh',
+                email: 'vikram.singh@example.com',
+                skill: 'Intermediate',
+                profilePic: 'https://i.pravatar.cc/150?img=18',
+                selected: false,
+                status: 'eliminated',
+                currentRound: 'round_final',
+                currentMatch: null,
+                matchesPlayed: 1,
+                roundsWon: [],
+                hasPlayed: true
+              }
+            ]
+          }
+        ];
+        
+        const staticRounds: TournamentRound[] = [
+          {
+            id: 'round_1',
+            name: 'Round 1',
+            displayName: 'Semi Finals',
+            status: 'completed',
+            isFrozen: true,
+            players: [
+              {
+                id: 'p1',
+                name: 'Arjun Mehta',
+                email: 'arjun.mehta@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=8',
+                selected: false,
+                status: 'winner',
+                currentRound: 'round_1',
+                currentMatch: 'round_1-match-1',
+                matchesPlayed: 1,
+                roundsWon: ['round_1'],
+                hasPlayed: true
+              },
+              {
+                id: 'p2',
+                name: 'Rohan Mehta',
+                email: 'rohan.mehta@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=19',
+                selected: false,
+                status: 'eliminated',
+                currentRound: 'round_1',
+                currentMatch: 'round_1-match-1',
+                matchesPlayed: 1,
+                roundsWon: [],
+                hasPlayed: true
+              },
+              {
+                id: 'p3',
+                name: 'Tanya Saxena',
+                email: 'tanya.saxena@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=4',
+                selected: false,
+                status: 'winner',
+                currentRound: 'round_1',
+                currentMatch: 'round_1-match-2',
+                matchesPlayed: 1,
+                roundsWon: ['round_1'],
+                hasPlayed: true
+              },
+              {
+                id: 'p4',
+                name: 'Vikram Singh',
+                email: 'vikram.singh@example.com',
+                skill: 'Intermediate',
+                profilePic: 'https://i.pravatar.cc/150?img=18',
+                selected: false,
+                status: 'eliminated',
+                currentRound: 'round_1',
+                currentMatch: 'round_1-match-2',
+                matchesPlayed: 1,
+                roundsWon: [],
+                hasPlayed: true
+              }
+            ],
+            matches: [
+              {
+                id: 'round_1-match-1',
+                player1: {
+                  id: 'p1',
+                  name: 'Arjun Mehta',
+                  email: 'arjun.mehta@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=8',
+                  selected: false,
+                  status: 'winner',
+                  currentRound: 'round_1',
+                  currentMatch: 'round_1-match-1',
+                  matchesPlayed: 1,
+                  roundsWon: ['round_1'],
+                  hasPlayed: true
+                },
+                player2: {
+                  id: 'p2',
+                  name: 'Rohan Mehta',
+                  email: 'rohan.mehta@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=19',
+                  selected: false,
+                  status: 'eliminated',
+                  currentRound: 'round_1',
+                  currentMatch: 'round_1-match-1',
+                  matchesPlayed: 1,
+                  roundsWon: [],
+                  hasPlayed: true
+                },
+                status: 'completed',
+                startTime: '2025-11-15T14:00:00.000Z',
+                endTime: '2025-11-15T14:35:00.000Z',
+                duration: '35m',
+                score: '5-3',
+                winner: {
+                  id: 'p1',
+                  name: 'Arjun Mehta',
+                  email: 'arjun.mehta@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=8',
+                  selected: false,
+                  status: 'winner',
+                  currentRound: 'round_1',
+                  currentMatch: 'round_1-match-1',
+                  matchesPlayed: 1,
+                  roundsWon: ['round_1'],
+                  hasPlayed: true
+                }
+              },
+              {
+                id: 'round_1-match-2',
+                player1: {
+                  id: 'p3',
+                  name: 'Tanya Saxena',
+                  email: 'tanya.saxena@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=4',
+                  selected: false,
+                  status: 'winner',
+                  currentRound: 'round_1',
+                  currentMatch: 'round_1-match-2',
+                  matchesPlayed: 1,
+                  roundsWon: ['round_1'],
+                  hasPlayed: true
+                },
+                player2: {
+                  id: 'p4',
+                  name: 'Vikram Singh',
+                  email: 'vikram.singh@example.com',
+                  skill: 'Intermediate',
+                  profilePic: 'https://i.pravatar.cc/150?img=18',
+                  selected: false,
+                  status: 'eliminated',
+                  currentRound: 'round_1',
+                  currentMatch: 'round_1-match-2',
+                  matchesPlayed: 1,
+                  roundsWon: [],
+                  hasPlayed: true
+                },
+                status: 'completed',
+                startTime: '2025-11-15T14:40:00.000Z',
+                endTime: '2025-11-15T15:15:00.000Z',
+                duration: '35m',
+                score: '4-2',
+                winner: {
+                  id: 'p3',
+                  name: 'Tanya Saxena',
+                  email: 'tanya.saxena@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=4',
+                  selected: false,
+                  status: 'winner',
+                  currentRound: 'round_1',
+                  currentMatch: 'round_1-match-2',
+                  matchesPlayed: 1,
+                  roundsWon: ['round_1'],
+                  hasPlayed: true
+                }
+              }
+            ],
+            winners: [
+              {
+                id: 'p1',
+                name: 'Arjun Mehta',
+                email: 'arjun.mehta@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=8',
+                selected: false,
+                status: 'winner',
+                currentRound: 'round_1',
+                currentMatch: null,
+                matchesPlayed: 1,
+                roundsWon: ['round_1'],
+                hasPlayed: true
+              },
+              {
+                id: 'p3',
+                name: 'Tanya Saxena',
+                email: 'tanya.saxena@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=4',
+                selected: false,
+                status: 'winner',
+                currentRound: 'round_1',
+                currentMatch: null,
+                matchesPlayed: 1,
+                roundsWon: ['round_1'],
+                hasPlayed: true
+              }
+            ],
+            losers: [
+              {
+                id: 'p2',
+                name: 'Rohan Mehta',
+                email: 'rohan.mehta@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=19',
+                selected: false,
+                status: 'eliminated',
+                currentRound: 'round_1',
+                currentMatch: null,
+                matchesPlayed: 1,
+                roundsWon: [],
+                hasPlayed: true
+              },
+              {
+                id: 'p4',
+                name: 'Vikram Singh',
+                email: 'vikram.singh@example.com',
+                skill: 'Intermediate',
+                profilePic: 'https://i.pravatar.cc/150?img=18',
+                selected: false,
+                status: 'eliminated',
+                currentRound: 'round_1',
+                currentMatch: null,
+                matchesPlayed: 1,
+                roundsWon: [],
+                hasPlayed: true
+              }
+            ]
+          },
+          {
+            id: 'round_2',
+            name: 'Final',
+            displayName: 'Championship Final',
+            status: 'completed',
+            isFrozen: true,
+            players: [
+              {
+                id: 'p1',
+                name: 'Arjun Mehta',
+                email: 'arjun.mehta@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=8',
+                selected: false,
+                status: 'winner',
+                currentRound: 'round_2',
+                currentMatch: 'round_2-match-1',
+                matchesPlayed: 2,
+                roundsWon: ['round_1', 'round_2'],
+                hasPlayed: true
+              },
+              {
+                id: 'p3',
+                name: 'Tanya Saxena',
+                email: 'tanya.saxena@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=4',
+                selected: false,
+                status: 'eliminated',
+                currentRound: 'round_2',
+                currentMatch: 'round_2-match-1',
+                matchesPlayed: 2,
+                roundsWon: ['round_1'],
+                hasPlayed: true
+              }
+            ],
+            matches: [
+              {
+                id: 'round_2-match-1',
+                player1: {
+                  id: 'p1',
+                  name: 'Arjun Mehta',
+                  email: 'arjun.mehta@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=8',
+                  selected: false,
+                  status: 'winner',
+                  currentRound: 'round_2',
+                  currentMatch: 'round_2-match-1',
+                  matchesPlayed: 2,
+                  roundsWon: ['round_1', 'round_2'],
+                  hasPlayed: true
+                },
+                player2: {
+                  id: 'p3',
+                  name: 'Tanya Saxena',
+                  email: 'tanya.saxena@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=4',
+                  selected: false,
+                  status: 'eliminated',
+                  currentRound: 'round_2',
+                  currentMatch: 'round_2-match-1',
+                  matchesPlayed: 2,
+                  roundsWon: ['round_1'],
+                  hasPlayed: true
+                },
+                status: 'completed',
+                startTime: '2025-11-15T15:30:00.000Z',
+                endTime: '2025-11-15T16:05:00.000Z',
+                duration: '35m',
+                score: '5-4',
+                winner: {
+                  id: 'p1',
+                  name: 'Arjun Mehta',
+                  email: 'arjun.mehta@example.com',
+                  skill: 'Advanced',
+                  profilePic: 'https://i.pravatar.cc/150?img=8',
+                  selected: false,
+                  status: 'winner',
+                  currentRound: 'round_2',
+                  currentMatch: 'round_2-match-1',
+                  matchesPlayed: 2,
+                  roundsWon: ['round_1', 'round_2'],
+                  hasPlayed: true
+                }
+              }
+            ],
+            winners: [
+              {
+                id: 'p1',
+                name: 'Arjun Mehta',
+                email: 'arjun.mehta@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=8',
+                selected: false,
+                status: 'winner',
+                currentRound: 'round_2',
+                currentMatch: null,
+                matchesPlayed: 2,
+                roundsWon: ['round_1', 'round_2'],
+                hasPlayed: true
+              }
+            ],
+            losers: [
+              {
+                id: 'p3',
+                name: 'Tanya Saxena',
+                email: 'tanya.saxena@example.com',
+                skill: 'Advanced',
+                profilePic: 'https://i.pravatar.cc/150?img=4',
+                selected: false,
+                status: 'eliminated',
+                currentRound: 'round_2',
+                currentMatch: null,
+                matchesPlayed: 2,
+                roundsWon: ['round_1'],
+                hasPlayed: true
+              }
+            ]
+          }
+        ];
 
         const tournamentData: TournamentDashboard = {
           id: tournamentIdNumber,
-          name: apiTournament?.name || tournamentName,
-          gameType: apiTournament?.gameType || '9-ball',
-          organizerName: apiTournament?.organizer?.name || 'Tournament Organizer',
-          organizerDescription: apiTournament?.description || 'Professional tournament management',
-          date: apiTournament?.startDate ? new Date(apiTournament.startDate).toISOString() : new Date('2025-10-15T14:00:00').toISOString(),
-          time: apiTournament?.startDate ? new Date(apiTournament.startDate).toLocaleTimeString() : new Date('2025-10-15T14:00:00').toLocaleTimeString(),
-          status: apiTournament?.status || 'active',
+          name: tournamentName,
+          gameType: '9-ball', // Default, can be updated from API if needed
+          organizerName: 'Tournament Organizer',
+          organizerDescription: 'Professional tournament management',
+          date: new Date('2025-10-15T14:00:00').toISOString(),
+          time: new Date('2025-10-15T14:00:00').toLocaleTimeString(),
+          status: 'active',
           players: currentParticipants,
-          maxPlayers: apiTournament?.maxParticipants || 50,
-          entryFee: apiTournament?.entryFee || 50,
-          venue: apiTournament?.venue || 'Delhi Sports Complex - Main Branch',
-          ballRules: apiTournament?.rules || 'Standard tournament rules',
+          maxPlayers: 50,
+          entryFee: 50,
+          venue: 'Delhi Sports Complex - Main Branch',
+          ballRules: 'Standard tournament rules',
           allPlayers: registeredPlayers.map((player: any) => ({
             id: player.id.toString(),
             name: player.name,
@@ -1380,21 +1900,99 @@ selectedRoundDisplayName: '',
             currentRound: null,
             currentMatch: null
           })),
-          rounds: mappedRounds,
-          currentRound: mappedRounds.length > 0 ? mappedRounds[0].id : null,
+          rounds: [],
+          //rounds: staticRounds,
+          //rounds: playersResponse.data.tournament_status.rounds,
+          currentRound: null,
           tournamentStarted: true,
           registeredPlayers: registeredPlayers,
           tournamentId: tournamentId // Store original tournament ID string for API calls
         };
 
+        
         // Navigate directly to tournament dashboard (skip modal)
-        this.setState({
+        /*this.setState({
           currentGameMatch: tournamentData,
           showGameOrganization: true,
           showTournamentModal: false, // Don't show popup
           selectedTournament: null,
           loading: false
-        });
+        });*/
+
+
+        /*
+        this.setState({
+          currentGameMatch: {
+            ...tournamentData,
+            rounds: staticRounds,
+            currentRound: tournamentData.currentRound ?? initialRoundId
+          },
+          rounds: staticRounds,
+          activeRoundTab: initialRoundId,
+          activeRoundSubTab: initialRoundId
+            ? { ...this.state.activeRoundSubTab, [initialRoundId]: 'players' }
+            : {},
+          showGameOrganization: true,
+          showTournamentModal: false,
+          selectedTournament: null,
+          loading: false
+        });*/
+
+        //const initialRoundId = staticRounds[0].id;
+        const initialRoundId = staticRounds[0]?.id ?? null;
+
+        const winnersToDisplay = staticRounds
+  .flatMap(round =>
+    round.matches
+      .filter(match => match.status === 'completed' && match.winner)
+      .map(match => ({
+        player: { ...match.winner },
+        roundWon: round.displayName ?? round.name,
+        roundWonId: round.id,
+        matchId: match.id,
+        wonAt: match.endTime ? new Date(match.endTime) : new Date(),
+        // defaults for Set Winner Titles modal
+        rank: 1,
+        title: '',
+        selected: true
+      }))
+  )
+  // keep only the most recent win per player
+  .reduce((acc, entry) => {
+    const idx = acc.findIndex(item => item.player.id === entry.player.id);
+    if (idx === -1 || ((entry.wonAt?.getTime() ?? 0) > (acc[idx].wonAt?.getTime() ?? 0))) {
+      if (idx === -1) acc.push(entry);
+      else acc[idx] = entry;
+    }
+    return acc;
+  }, [] as Array<{
+    player: Player;
+    roundWon: string;
+    roundWonId: string;
+    matchId: string;
+    wonAt: Date;
+    rank: number;
+    title: string;
+    selected: boolean;
+  }>)
+  // assign sequential ranks for display
+  .map((winner, index) => ({ ...winner, rank: index + 1 }));
+
+  this.setState({
+    currentGameMatch: {
+      ...tournamentData,
+      rounds: staticRounds,
+      currentRound: initialRoundId
+    },
+    rounds: staticRounds,
+    winnersToDisplay,
+    activeRoundTab: initialRoundId,
+    activeRoundSubTab: { [initialRoundId]: 'players' },
+    showGameOrganization: true,
+    showTournamentModal: false,
+    selectedTournament: null,
+    loading: false
+  });
 
         console.log('✅ Navigated directly to tournament dashboard (status:', status, ')');
         
@@ -1907,9 +2505,7 @@ selectedRoundDisplayName: '',
           currentGameMatch: tournamentData,
           showGameOrganization: true,
           showTournamentModal: false,
-          selectedTournament: null,
-          activeRoundTab: activeRoundTab,
-          activeRoundSubTab: { [activeRoundTab]: 'matches' }
+          selectedTournament: null
         });
       }
     }
@@ -5063,13 +5659,15 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
     );
   })}
 </div>
-</div>
+
+
+
+
+
+                  </div>
 
 {/* Round Content */}
-{console.log('activeRoundTab', this.state.activeRoundTab)}
-{console.log('currentGameMatch.rounds', this.state.currentGameMatch.rounds)}
-{ this.state.currentGameMatch.rounds?.map((round: TournamentRound, index: number) => (
-  console.log('round', round.id),
+{this.state.activeRoundTab && this.state.currentGameMatch.rounds?.map((round: TournamentRound, index: number) => (
   this.state.activeRoundTab === round.id && (
     <div key={round.id} className="bg-white rounded-2xl shadow-lg border border-gray-100">
       {/* Round Header */}
