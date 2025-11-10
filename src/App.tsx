@@ -18,6 +18,7 @@ import UserProfile from './components/auth/UserProfile';
 
 class App extends Component {
   render() {
+    console.log('🔄 App: Rendering application...');
     return (
       <AuthProvider>
         <Router>
@@ -28,13 +29,13 @@ class App extends Component {
             <Route path="/signup" element={<Signup />} />
             
             {/* Protected Routes */}
-            <Route 
-              path="/dashboard" 
+            <Route
+              path="/dashboard"
               element={
                 <ProtectedRoute>
                   <OrganizerDashboard />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route 
               path="/matches" 

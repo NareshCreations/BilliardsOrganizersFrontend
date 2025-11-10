@@ -66,7 +66,7 @@ export class OrganizerDashboard extends BaseComponentComplete<DashboardProps, Da
    * Handle section navigation
    */
   private handleSectionChange = (section: DashboardState['activeSection']): void => {
-    this.updateState({ activeSection: section });
+    this.setState({ activeSection: section });
     this.log('Section changed', { section });
   };
 
@@ -77,7 +77,7 @@ export class OrganizerDashboard extends BaseComponentComplete<DashboardProps, Da
     const updatedNotifications = this.state.notifications.filter(
       notification => notification.id !== notificationId
     );
-    this.updateState({ notifications: updatedNotifications });
+    this.setState({ notifications: updatedNotifications });
   };
 
   /**
@@ -188,6 +188,8 @@ export class OrganizerDashboard extends BaseComponentComplete<DashboardProps, Da
    */
   render(): React.ReactNode {
     const { isLoading } = this.state;
+
+    console.log('🔄 Dashboard: Rendering dashboard component');
 
     return (
       <div className={styles.organizerHome}>
