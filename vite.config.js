@@ -31,4 +31,7 @@ export default defineConfig({
       },
     },
   },
+  optimizeDeps: {
+    exclude: ['@rollup/rollup-darwin-arm64', '@rollup/rollup-darwin-x64', '@rollup/rollup-linux-arm64-gnu', '@rollup/rollup-linux-x64-gnu', '@rollup/rollup-win32-x64-msvc'],
+  },
 })
