@@ -5,8 +5,8 @@ import path from 'path'
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 3009,
-    open: true
+    port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
+    open: false
   },
   resolve: {
     alias: {
@@ -32,6 +32,6 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-    exclude: ['@rollup/rollup-darwin-arm64', '@rollup/rollup-darwin-x64', '@rollup/rollup-linux-arm64-gnu', '@rollup/rollup-linux-x64-gnu', '@rollup/rollup-win32-x64-msvc'],
+    exclude: ['@rollup/rollup-darwin-arm64', '@rollup/rollup-darwin-x64', '@rollup/rollup-linux-arm64-gnu', '@rollup/rollup-linux-arm64-musl', '@rollup/rollup-linux-x64-gnu', '@rollup/rollup-win32-x64-msvc'],
   },
 })
