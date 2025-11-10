@@ -1,7 +1,7 @@
 import React, { Component } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import styles from './Auth.module.scss';
-import { apiService } from '../../services/api';
+import authService from '../../services/authService';
 
 interface LoginState {
   formData: {
@@ -84,9 +84,10 @@ class Login extends Component<any, LoginState> {
       console.log('Attempting login with:', { email: this.state.formData.email });
       
       // Call the real login API
-      const response = await apiService.login({
-        email: this.state.formData.email,
-        password: this.state.formData.password
+      const response = await authService.login({
+        identifier: this.state.formData.email,
+        password: this.state.formData.password,
+        identifierType: 'email'
       });
       
       console.log('API Response:', response);
@@ -94,67 +95,28 @@ class Login extends Component<any, LoginState> {
         success: response.success,
         hasData: !!response.data,
         dataKeys: response.data ? Object.keys(response.data) : 'no data',
-        hasAccessToken: response.data?.accessToken ? 'yes' : 'no',
-        hasRefreshToken: response.data?.refreshToken ? 'yes' : 'no',
+        hasTokens: response.data?.tokens ? 'yes' : 'no',
         hasUser: response.data?.user ? 'yes' : 'no'
       });
-      
+
       if (response.success && response.data) {
-        // Check if tokens exist in the response (they are directly in data, not nested under tokens)
-        if (response.data.accessToken) {
-          // Store tokens in localStorage
-          apiService.setTokens(
-            response.data.accessToken,
-            response.data.refreshToken
-          );
-          
-          // Handle successful login
-          console.log('Login successful:', response.data.user);
-          
-          // Clear any previous errors
-          this.setState({ errors: {} });
-          
-          // Navigate to dashboard after successful login
-          console.log('Navigating to dashboard...');
-          this.props.navigate('/dashboard');
-          console.log('Navigation called');
-        } else {
-          // Fallback: if no accessToken but user data exists, use test mode
-          if (response.data.user) {
-            console.log('No accessToken found, using test mode');
-            apiService.setTokens('test-access-token', 'test-refresh-token');
-            this.setState({ errors: {} });
-            this.props.navigate('/dashboard');
-            return;
-          }
-          
-          throw new Error('No access token found in response');
-        }
+        // authService automatically stores tokens, just handle success
+        console.log('Login successful:', response.data.user);
+
+        // Clear any previous errors
+        this.setState({ errors: {} });
+
+        // Navigate to dashboard after successful login
+        console.log('Navigating to dashboard...');
+        this.props.navigate('/dashboard');
+        console.log('Navigation called');
       } else {
         throw new Error(response.message || 'Login failed');
       }
       
     } catch (error: any) {
       console.error('Login failed:', error);
-      
-      // Check if it's a network error (backend not running)
-      if (error.message.includes('Unable to connect to server')) {
-        // For testing purposes, allow login with any credentials when backend is down
-        console.log('Backend not available, using test mode');
-        
-        // Store dummy tokens for testing
-        apiService.setTokens('test-access-token', 'test-refresh-token');
-        
-        // Clear any previous errors
-        this.setState({ errors: {} });
-        
-        // Navigate to dashboard for testing
-        console.log('Test mode: Navigating to dashboard...');
-        this.props.navigate('/dashboard');
-        console.log('Test mode: Navigation called');
-        return;
-      }
-      
+
       // Show error message to user
       this.setState({
         errors: {

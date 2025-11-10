@@ -1,5 +1,6 @@
 import React, { Component } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import DashboardHeader from '@/components/Header/DashboardHeader';
 import { Footer } from '@/components/organisms/Footer';
 import styles from './Dashboard.module.scss';

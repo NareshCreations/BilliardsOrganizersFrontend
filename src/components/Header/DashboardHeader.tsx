@@ -1,141 +1,100 @@
-import React, { Component } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import styles from './Header.module.scss';
-import { apiService } from '../../services/api';
 
-interface DashboardHeaderState {
-  isScrolled: boolean;
-  isMobileMenuOpen: boolean;
-  activeMenuItem: string;
-  isLoggingOut: boolean;
+interface DashboardHeaderProps {
+  variant?: 'landing' | 'dashboard';
+  onSectionChange?: (section: 'dashboard' | 'tournaments' | 'players' | 'live-games') => void;
+  activeSection?: string;
 }
 
-// Higher-order component to provide navigation
-function withNavigation(WrappedComponent: any) {
-  return function WithNavigationComponent(props: any) {
-    const navigate = useNavigate();
-    return <WrappedComponent {...props} navigate={navigate} />;
-  };
-}
+const DashboardHeader: React.FC<DashboardHeaderProps> = ({
+  variant = 'landing',
+  onSectionChange,
+  activeSection = ''
+}) => {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
 
-class DashboardHeader extends Component<any, DashboardHeaderState> {
-  private scrollTimeout: ReturnType<typeof setTimeout> | null = null;
-  private resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [activeMenuItem, setActiveMenuItem] = useState('');
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  constructor(props: any) {
-    super(props);
-    this.state = {
-      isScrolled: false,
-      isMobileMenuOpen: false,
-      activeMenuItem: '',
-      isLoggingOut: false
-    };
-  }
-
-  componentDidMount() {
+  useEffect(() => {
     const throttledScroll = () => {
-      if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
-      this.scrollTimeout = setTimeout(() => {
-        const scrollTop = window.scrollY;
-        this.setState({ isScrolled: scrollTop > 50 });
-      }, 10);
+      const scrollTop = window.scrollY;
+      setIsScrolled(scrollTop > 50);
     };
 
     const throttledResize = () => {
-      if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
-      this.resizeTimeout = setTimeout(() => {
-        if (window.innerWidth > 768) {
-          this.setState({ isMobileMenuOpen: false });
-        }
-      }, 100);
+      if (window.innerWidth > 768) {
+        setIsMobileMenuOpen(false);
+      }
     };
 
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        this.setState({ isMobileMenuOpen: false });
+        setIsMobileMenuOpen(false);
       }
     };
 
     window.addEventListener('scroll', throttledScroll);
     window.addEventListener('resize', throttledResize);
     document.addEventListener('keydown', handleEscape);
-  }
 
-  componentDidUpdate(prevProps: {}, prevState: DashboardHeaderState) {
+    return () => {
+      window.removeEventListener('scroll', throttledScroll);
+      window.removeEventListener('resize', throttledResize);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  useEffect(() => {
     // Lock body scroll when mobile menu is open
-    if (this.state.isMobileMenuOpen !== prevState.isMobileMenuOpen) {
-      if (this.state.isMobileMenuOpen) {
-        document.body.style.overflow = 'hidden';
-      } else {
-        document.body.style.overflow = 'unset';
-      }
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
     }
-  }
-
-  componentWillUnmount() {
-    // Cleanup event listeners
-    window.removeEventListener('scroll', () => {});
-    window.removeEventListener('resize', () => {});
-    document.removeEventListener('keydown', () => {});
-    
-    // Clear timeouts
-    if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
-    if (this.resizeTimeout) clearTimeout(this.resizeTimeout);
-    
-    // Reset body overflow
-    document.body.style.overflow = 'unset';
-  }
+  }, [isMobileMenuOpen]);
 
   // Handle mobile menu toggle
-  toggleMobileMenu = () => {
-    this.setState({ isMobileMenuOpen: !this.state.isMobileMenuOpen });
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(!isMobileMenuOpen);
   };
 
   // Handle menu item click
-  handleMenuItemClick = (menuItem: string) => {
-    this.setState({
-      activeMenuItem: menuItem,
-      isMobileMenuOpen: false
-    });
+  const handleMenuItemClick = (menuItem: string) => {
+    setActiveMenuItem(menuItem);
+    setIsMobileMenuOpen(false);
   };
 
   // Handle logout
-  handleLogout = async () => {
-    this.setState({ isLoggingOut: true });
-    
+  const handleLogout = async () => {
+    console.log('🚪 DashboardHeader: Logging out and redirecting to login...');
+    setIsLoggingOut(true);
     try {
-      console.log('Logging out...');
-      
-      // Call logout API
-      await apiService.logout();
-      
-      // Clear tokens from localStorage
-      apiService.clearTokens();
-      
-      console.log('Logout successful, redirecting to home...');
-      
-      // Navigate to home page
-      this.props.navigate('/');
-      
-    } catch (error: any) {
-      console.error('Logout failed:', error);
-      
-      // Even if API call fails, clear local tokens and redirect
-      apiService.clearTokens();
-      this.props.navigate('/');
-      
+      logout(); // AuthContext clears auth state
+      // Force a full page reload to clear all state and redirect
+      window.location.href = '/login';
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+      // Fallback to window.location if navigation fails
+      window.location.href = '/login';
     } finally {
-      this.setState({ isLoggingOut: false });
+      setIsLoggingOut(false);
     }
   };
 
   // Hamburger Button Component
-  HamburgerButton = () => (
+  const HamburgerButton = () => (
     <button
       className={styles.menuToggle}
-      onClick={this.toggleMobileMenu}
+      onClick={toggleMobileMenu}
       aria-label="Toggle mobile menu"
-      aria-expanded={this.state.isMobileMenuOpen}
+      aria-expanded={isMobileMenuOpen}
       aria-controls="mobile-menu"
     >
       <div className={styles.hamburgerIcon}>
@@ -146,15 +105,12 @@ class DashboardHeader extends Component<any, DashboardHeaderState> {
     </button>
   );
 
-  render() {
-    const { isScrolled, isMobileMenuOpen, activeMenuItem } = this.state;
-    
-    return (
-      <>
-        <header className={`${styles.header} ${isScrolled ? styles.scrolled : ''}`}>
-          <div className={styles.headerContainer}>
-            <this.HamburgerButton />
-          
+  return (
+    <>
+      <header className={`${styles.header} ${isScrolled ? styles.scrolled : ''}`}>
+        <div className={styles.headerContainer}>
+          <HamburgerButton />
+
           <div className={styles.headerLogo}>
             <div className={styles.poolBalls}>
               <div className={`${styles.ball} ${styles.ball8}`}>8</div>
@@ -169,46 +125,46 @@ class DashboardHeader extends Component<any, DashboardHeaderState> {
           <nav className={styles.navMenu}>
             <ul>
               <li>
-                <Link 
-                  to="/" 
+                <Link
+                  to="/"
                   className={`${styles.navLink} ${activeMenuItem === 'home' ? styles.active : ''}`}
-                  onClick={() => this.handleMenuItemClick('home')}
+                  onClick={() => handleMenuItemClick('home')}
                 >
                   Home
                 </Link>
               </li>
               <li>
-                <Link 
-                  to="/dashboard" 
+                <Link
+                  to="/dashboard"
                   className={`${styles.navLink} ${activeMenuItem === 'games' ? styles.active : ''}`}
-                  onClick={() => this.handleMenuItemClick('games')}
+                  onClick={() => handleMenuItemClick('games')}
                 >
                   Games
                 </Link>
               </li>
               <li>
-                <a 
-                  href="#about" 
+                <a
+                  href="#about"
                   className={`${styles.navLink} ${activeMenuItem === 'about' ? styles.active : ''}`}
-                  onClick={() => this.handleMenuItemClick('about')}
+                  onClick={() => handleMenuItemClick('about')}
                 >
                   About
                 </a>
               </li>
               <li>
-                <a 
-                  href="#services" 
+                <a
+                  href="#services"
                   className={`${styles.navLink} ${activeMenuItem === 'services' ? styles.active : ''}`}
-                  onClick={() => this.handleMenuItemClick('services')}
+                  onClick={() => handleMenuItemClick('services')}
                 >
                   Services
                 </a>
               </li>
               <li>
-                <a 
-                  href="#contact" 
+                <a
+                  href="#contact"
                   className={`${styles.navLink} ${activeMenuItem === 'contact' ? styles.active : ''}`}
-                  onClick={() => this.handleMenuItemClick('contact')}
+                  onClick={() => handleMenuItemClick('contact')}
                 >
                   Contact
                 </a>
@@ -217,12 +173,12 @@ class DashboardHeader extends Component<any, DashboardHeaderState> {
           </nav>
 
           <div className={styles.headerCta}>
-            <button 
+            <button
               className={styles.logoutButton}
-              onClick={this.handleLogout}
-              disabled={this.state.isLoggingOut}
+              onClick={handleLogout}
+              disabled={isLoggingOut}
             >
-              {this.state.isLoggingOut ? 'Logging out...' : 'Logout'}
+              {isLoggingOut ? 'Logging out...' : 'Logout'}
             </button>
           </div>
         </div>
@@ -230,12 +186,12 @@ class DashboardHeader extends Component<any, DashboardHeaderState> {
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
           <>
-            <div 
+            <div
               className={styles.mobileMenuOverlay}
-              onClick={() => this.setState({ isMobileMenuOpen: false })}
+              onClick={() => setIsMobileMenuOpen(false)}
               aria-hidden="true"
             />
-            <nav 
+            <nav
               className={styles.mobileMenu}
               id="mobile-menu"
               role="navigation"
@@ -243,51 +199,51 @@ class DashboardHeader extends Component<any, DashboardHeaderState> {
             >
               <ul>
                 <li className={styles.mobileNavItem} role="none">
-                  <Link 
-                    to="/" 
-                    className={styles.mobileNavLink} 
+                  <Link
+                    to="/"
+                    className={styles.mobileNavLink}
                     role="menuitem"
-                    onClick={() => this.handleMenuItemClick('home')}
+                    onClick={() => handleMenuItemClick('home')}
                   >
                     Home
                   </Link>
                 </li>
                 <li className={styles.mobileNavItem} role="none">
-                  <Link 
-                    to="/dashboard" 
-                    className={styles.mobileNavLink} 
+                  <Link
+                    to="/dashboard"
+                    className={styles.mobileNavLink}
                     role="menuitem"
-                    onClick={() => this.handleMenuItemClick('games')}
+                    onClick={() => handleMenuItemClick('games')}
                   >
                     Games
                   </Link>
                 </li>
                 <li className={styles.mobileNavItem} role="none">
-                  <a 
-                    href="#about" 
-                    className={styles.mobileNavLink} 
+                  <a
+                    href="#about"
+                    className={styles.mobileNavLink}
                     role="menuitem"
-                    onClick={() => this.handleMenuItemClick('about')}
+                    onClick={() => handleMenuItemClick('about')}
                   >
                     About
                   </a>
                 </li>
                 <li className={styles.mobileNavItem} role="none">
-                  <a 
-                    href="#services" 
-                    className={styles.mobileNavLink} 
+                  <a
+                    href="#services"
+                    className={styles.mobileNavLink}
                     role="menuitem"
-                    onClick={() => this.handleMenuItemClick('services')}
+                    onClick={() => handleMenuItemClick('services')}
                   >
                     Services
                   </a>
                 </li>
                 <li className={styles.mobileNavItem} role="none">
-                  <a 
-                    href="#contact" 
-                    className={styles.mobileNavLink} 
+                  <a
+                    href="#contact"
+                    className={styles.mobileNavLink}
                     role="menuitem"
-                    onClick={() => this.handleMenuItemClick('contact')}
+                    onClick={() => handleMenuItemClick('contact')}
                   >
                     Contact
                   </a>
@@ -296,13 +252,13 @@ class DashboardHeader extends Component<any, DashboardHeaderState> {
                 <li className={styles.mobileNavSeparator}></li>
                 {/* Logout Link */}
                 <li className={styles.mobileNavItem} role="none">
-                  <button 
-                    className={styles.mobileAuthLink} 
+                  <button
+                    className={styles.mobileAuthLink}
                     role="menuitem"
-                    onClick={this.handleLogout}
-                    disabled={this.state.isLoggingOut}
+                    onClick={handleLogout}
+                    disabled={isLoggingOut}
                   >
-                    {this.state.isLoggingOut ? 'Logging out...' : 'Logout'}
+                    {isLoggingOut ? 'Logging out...' : 'Logout'}
                   </button>
                 </li>
               </ul>
@@ -311,8 +267,7 @@ class DashboardHeader extends Component<any, DashboardHeaderState> {
         )}
       </header>
     </>
-    );
-  }
-}
+  );
+};
 
-export default withNavigation(DashboardHeader);
+export default DashboardHeader;

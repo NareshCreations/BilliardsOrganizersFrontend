@@ -1,6 +1,7 @@
-import React from 'react';
-import { BaseComponentComplete } from './base/BaseComponent';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import { OrganizerHeader } from './organisms/OrganizerHeader/OrganizerHeader';
+import DashboardHeader from './Header/DashboardHeader';
 import { DashboardOverview } from './organisms/DashboardOverview/DashboardOverview';
 import { TournamentManagement } from './organisms/TournamentManagement/TournamentManagement';
 import { PlayerManagement } from './organisms/PlayerManagement/PlayerManagement';
@@ -17,75 +18,107 @@ export interface DashboardProps {
     role: string;
     organization: string;
   };
-}
-
-/**
- * Dashboard state interface
- */
-interface DashboardState {
-  activeSection: 'dashboard' | 'tournaments' | 'players' | 'live-games';
-  isLoading: boolean;
-  notifications: Array<{
-    id: string;
-    message: string;
-    type: 'info' | 'warning' | 'success' | 'error';
-    timestamp: Date;
-  }>;
+  headerVariant?: 'organizer' | 'dashboard';
 }
 
 /**
  * Professional Dashboard Component
  * Main dashboard for billiards tournament organizers
  */
-export class OrganizerDashboard extends BaseComponentComplete<DashboardProps, DashboardState> {
-  /**
-   * Get initial state for the organizer home page
-   */
-  protected getInitialState(): DashboardState {
-    return {
-      activeSection: 'dashboard',
-      isLoading: false,
-      notifications: [
-        {
-          id: '1',
-          message: 'Tournament "Spring Championship" starts in 2 hours',
-          type: 'info',
-          timestamp: new Date()
-        },
-        {
-          id: '2',
-          message: 'Player registration deadline approaching',
-          type: 'warning',
-          timestamp: new Date()
-        }
-      ]
+const OrganizerDashboard: React.FC<DashboardProps> = (props) => {
+  const { logout } = useAuth();
+
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'tournaments' | 'players' | 'live-games'>('dashboard');
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [notifications, setNotifications] = useState<Array<{
+    id: string;
+    message: string;
+    type: 'info' | 'warning' | 'success' | 'error';
+    timestamp: Date;
+  }>>([
+    {
+      id: '1',
+      message: 'Tournament "Spring Championship" starts in 2 hours',
+      type: 'info',
+      timestamp: new Date()
+    },
+    {
+      id: '2',
+      message: 'Player registration deadline approaching',
+      type: 'warning',
+      timestamp: new Date()
+    }
+  ]);
+
+  // Handle online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('🌐 Dashboard: Connection restored');
+      setIsOnline(true);
+      // Add a notification when coming back online
+      const onlineNotification = {
+        id: `online-${Date.now()}`,
+        message: 'Connection restored - you are back online',
+        type: 'success' as const,
+        timestamp: new Date()
+      };
+      setNotifications(prev => [onlineNotification, ...prev]);
     };
-  }
+
+    const handleOffline = () => {
+      console.log('🚫 Dashboard: Connection lost');
+      setIsOnline(false);
+      // Add a notification when going offline
+      const offlineNotification = {
+        id: `offline-${Date.now()}`,
+        message: 'Connection lost - working in offline mode',
+        type: 'warning' as const,
+        timestamp: new Date()
+      };
+      setNotifications(prev => [offlineNotification, ...prev]);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  /**
+   * Handle logout
+   */
+  const handleLogout = () => {
+    console.log('🚪 OrganizerDashboard: Logging out and redirecting to login...');
+    logout(); // AuthContext clears auth state
+    window.location.href = '/login'; // Redirect to login page
+  };
 
   /**
    * Handle section navigation
    */
-  private handleSectionChange = (section: DashboardState['activeSection']): void => {
-    this.updateState({ activeSection: section });
-    this.log('Section changed', { section });
+  const handleSectionChange = (section: 'dashboard' | 'tournaments' | 'players' | 'live-games') => {
+    setActiveSection(section);
+    console.log('Section changed', { section });
   };
 
   /**
    * Handle notification dismissal
    */
-  private handleNotificationDismiss = (notificationId: string): void => {
-    const updatedNotifications = this.state.notifications.filter(
+  const handleNotificationDismiss = (notificationId: string) => {
+    const updatedNotifications = notifications.filter(
       notification => notification.id !== notificationId
     );
-    this.updateState({ notifications: updatedNotifications });
+    setNotifications(updatedNotifications);
   };
 
   /**
    * Render navigation sidebar
    */
-  private renderNavigationSidebar(): React.ReactNode {
-    const { activeSection } = this.state;
-
+  const renderNavigationSidebar = () => {
     const navigationItems = [
       { id: 'dashboard', label: 'Dashboard', icon: '📊' },
       { id: 'tournaments', label: 'Tournaments', icon: '🏆' },
@@ -98,11 +131,11 @@ export class OrganizerDashboard extends BaseComponentComplete<DashboardProps, Da
         <div className={styles.sidebarHeader}>
           <h2 className={styles.sidebarTitle}>Organizer Portal</h2>
           <div className={styles.userInfo}>
-            <span className={styles.userName}>{this.props.user?.name || 'Organizer'}</span>
-            <span className={styles.userRole}>{this.props.user?.role || 'Tournament Director'}</span>
+            <span className={styles.userName}>{props.user?.name || 'Organizer'}</span>
+            <span className={styles.userRole}>{props.user?.role || 'Tournament Director'}</span>
           </div>
         </div>
-        
+
         <ul className={styles.navigationList}>
           {navigationItems.map((item) => (
             <li key={item.id} className={styles.navigationItem}>
@@ -110,7 +143,7 @@ export class OrganizerDashboard extends BaseComponentComplete<DashboardProps, Da
                 className={`${styles.navigationButton} ${
                   activeSection === item.id ? styles.active : ''
                 }`}
-                onClick={() => this.handleSectionChange(item.id)}
+                onClick={() => handleSectionChange(item.id)}
               >
                 <span className={styles.navigationIcon}>{item.icon}</span>
                 <span className={styles.navigationLabel}>{item.label}</span>
@@ -120,14 +153,12 @@ export class OrganizerDashboard extends BaseComponentComplete<DashboardProps, Da
         </ul>
       </nav>
     );
-  }
+  };
 
   /**
    * Render notifications panel
    */
-  private renderNotificationsPanel(): React.ReactNode {
-    const { notifications } = this.state;
-
+  const renderNotificationsPanel = () => {
     if (notifications.length === 0) return null;
 
     return (
@@ -136,7 +167,7 @@ export class OrganizerDashboard extends BaseComponentComplete<DashboardProps, Da
           <h3 className={styles.notificationsTitle}>Notifications</h3>
           <span className={styles.notificationsCount}>{notifications.length}</span>
         </div>
-        
+
         <div className={styles.notificationsList}>
           {notifications.map((notification) => (
             <div
@@ -151,7 +182,7 @@ export class OrganizerDashboard extends BaseComponentComplete<DashboardProps, Da
               </div>
               <button
                 className={styles.notificationDismiss}
-                onClick={() => this.handleNotificationDismiss(notification.id)}
+                onClick={() => handleNotificationDismiss(notification.id)}
                 aria-label="Dismiss notification"
               >
                 ×
@@ -161,14 +192,12 @@ export class OrganizerDashboard extends BaseComponentComplete<DashboardProps, Da
         </div>
       </div>
     );
-  }
+  };
 
   /**
    * Render main content area
    */
-  private renderMainContent(): React.ReactNode {
-    const { activeSection } = this.state;
-
+  const renderMainContent = () => {
     switch (activeSection) {
       case 'dashboard':
         return <DashboardOverview />;
@@ -181,49 +210,63 @@ export class OrganizerDashboard extends BaseComponentComplete<DashboardProps, Da
       default:
         return <DashboardOverview />;
     }
-  }
+  };
 
-  /**
-   * Render the organizer home page
-   */
-  render(): React.ReactNode {
-    const { isLoading } = this.state;
+  console.log('🔄 Dashboard: Rendering dashboard component');
 
-    return (
-      <div className={styles.organizerHome}>
-        <OrganizerHeader />
-        
-        <div className={styles.mainLayout}>
-          {this.renderNavigationSidebar()}
-          
-          <main className={styles.mainContent}>
-            <div className={styles.contentHeader}>
-              <h1 className={styles.pageTitle}>
-                {this.state.activeSection === 'dashboard' && 'Dashboard Overview'}
-                {this.state.activeSection === 'tournaments' && 'Tournament Management'}
-                {this.state.activeSection === 'players' && 'Player Management'}
-                {this.state.activeSection === 'live-games' && 'Live Game Control'}
-              </h1>
-              <div className={styles.contentActions}>
-                {this.renderNotificationsPanel()}
-              </div>
-            </div>
-            
-            <div className={styles.contentBody}>
-              {isLoading ? (
-                <div className={styles.loadingState}>
-                  <div className={styles.spinner}></div>
-                  <p>Loading...</p>
+  return (
+    <div className={styles.organizerHome}>
+      {props.headerVariant === 'dashboard' ? (
+        <DashboardHeader
+          variant="dashboard"
+          onSectionChange={handleSectionChange}
+          activeSection={activeSection}
+        />
+      ) : (
+        <OrganizerHeader onLogout={handleLogout} />
+      )}
+
+      <div className={styles.mainLayout}>
+        {renderNavigationSidebar()}
+
+        <main className={styles.mainContent}>
+          <div className={styles.contentHeader}>
+            <h1 className={styles.pageTitle}>
+              {activeSection === 'dashboard' && 'Dashboard Overview'}
+              {activeSection === 'tournaments' && 'Tournament Management'}
+              {activeSection === 'players' && 'Player Management'}
+              {activeSection === 'live-games' && 'Live Game Control'}
+            </h1>
+            <div className={styles.contentActions}>
+              {/* Online/Offline Status Indicator */}
+              <div className={`${styles.connectionStatus} ${isOnline ? styles.online : styles.offline}`}>
+                <div className={styles.statusIndicator}>
+                  <span className={styles.statusDot}></span>
+                  <span className={styles.statusText}>
+                    {isOnline ? 'Online' : 'Offline'}
+                  </span>
                 </div>
-              ) : (
-                this.renderMainContent()
-              )}
+              </div>
+              {renderNotificationsPanel()}
             </div>
-          </main>
-        </div>
-        
-        <OrganizerFooter />
+          </div>
+
+          <div className={styles.contentBody}>
+            {isLoading ? (
+              <div className={styles.loadingState}>
+                <div className={styles.spinner}></div>
+                <p>Loading...</p>
+              </div>
+            ) : (
+              renderMainContent()
+            )}
+          </div>
+        </main>
       </div>
-    );
-  }
-}
+
+      <OrganizerFooter />
+    </div>
+  );
+};
+
+export { OrganizerDashboard };

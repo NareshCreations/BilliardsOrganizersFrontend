@@ -42,14 +42,14 @@ export class OrganizerHeader extends BaseComponentComplete<OrganizerHeaderProps,
    * Handle menu toggle
    */
   private handleMenuToggle = (): void => {
-    this.updateState({ isMenuOpen: !this.state.isMenuOpen });
+    this.setState({ isMenuOpen: !this.state.isMenuOpen });
   };
 
   /**
    * Handle profile dropdown toggle
    */
   private handleProfileToggle = (): void => {
-    this.updateState({ isProfileDropdownOpen: !this.state.isProfileDropdownOpen });
+    this.setState({ isProfileDropdownOpen: !this.state.isProfileDropdownOpen });
   };
 
   /**
@@ -65,7 +65,7 @@ export class OrganizerHeader extends BaseComponentComplete<OrganizerHeaderProps,
    */
   private handleProfileClick = (): void => {
     this.props.onProfileClick?.();
-    this.updateState({ isProfileDropdownOpen: false });
+    this.setState({ isProfileDropdownOpen: false });
   };
 
   /**

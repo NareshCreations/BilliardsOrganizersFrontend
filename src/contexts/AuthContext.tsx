@@ -50,23 +50,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (!refreshed) {
               console.log('❌ Token refresh failed, logging out and redirecting to login');
               handleLogout();
-              // Redirect to login page
-              window.location.href = '/login';
+              // Note: Redirect will be handled by ProtectedRoute when auth state changes
             } else {
               console.log('✅ Token refreshed successfully');
             }
           } catch (error) {
             console.log('❌ Token refresh error, logging out and redirecting to login:', error);
             handleLogout();
-            // Redirect to login page
-            window.location.href = '/login';
+            // Note: Redirect will be handled by ProtectedRoute when auth state changes
           }
         }
         if (!authService.isAuthenticated()) {
           console.log('❌ User not authenticated, logging out and redirecting to login');
           handleLogout();
-          // Redirect to login page
-          window.location.href = '/login';
+          // Note: Redirect will be handled by ProtectedRoute when auth state changes
         }
       }, 60000); // Check every minute
 
@@ -178,6 +175,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUser(null);
     setIsAuthenticated(false);
     console.log('🚪 AuthContext: User logged out successfully');
+    // Note: Redirect is handled by individual components using React Router
   };
 
   const refreshUser = async () => {

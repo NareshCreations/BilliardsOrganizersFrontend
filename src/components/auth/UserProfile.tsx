@@ -15,7 +15,8 @@ const UserProfile: React.FC = () => {
 
   const handleLogout = () => {
     if (window.confirm('Are you sure you want to logout?')) {
-      logout();
+      logout(); // AuthContext clears auth state
+      window.location.href = '/login'; // Redirect to login page
     }
   };
 
@@ -100,12 +101,12 @@ const UserProfile: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-500">Last Login</label>
-              <p className="mt-1 text-sm text-gray-900">{formatDate(user.lastLogin)}</p>
+              <p className="mt-1 text-sm text-gray-900">{user.lastLogin ? formatDate(user.lastLogin) : 'Never'}</p>
             </div>
-            
+
             <div>
               <label className="block text-sm font-medium text-gray-500">Account Created</label>
-              <p className="mt-1 text-sm text-gray-900">{formatDate(user.createdAt)}</p>
+              <p className="mt-1 text-sm text-gray-900">{user.createdAt ? formatDate(user.createdAt) : 'Unknown'}</p>
             </div>
           </div>
         </div>

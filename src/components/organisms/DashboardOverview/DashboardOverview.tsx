@@ -268,6 +268,8 @@ export class DashboardOverview extends BaseComponentComplete<DashboardOverviewPr
    * Render the dashboard overview
    */
   render(): React.ReactNode {
+    console.log('🔄 DashboardOverview: Rendering dashboard overview component');
+
     return (
       <div className={styles.dashboardOverview}>
         <div className={styles.dashboardHeader}>
