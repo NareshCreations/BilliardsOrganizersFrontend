@@ -1,5 +1,7 @@
 import React from 'react';
 import { BaseComponentComplete } from '../../base/BaseComponent';
+import { matchesApiService } from '../../../services/matchesApi';
+import authService from '../../../services/authService';
 
 export interface PlayerManagementProps {}
 
@@ -24,56 +26,14 @@ interface PlayerManagementState {
   };
   searchTerm: string;
   filterStatus: 'all' | 'active' | 'inactive' | 'suspended';
+  loading: boolean;
+  error: string | null;
 }
 
 export class PlayerManagement extends BaseComponentComplete<PlayerManagementProps, PlayerManagementState> {
   protected getInitialState(): PlayerManagementState {
     return {
-      players: [
-        {
-          id: '1',
-          name: 'John Smith',
-          email: 'john.smith@email.com',
-          phone: '+1-555-0123',
-          skillLevel: 'advanced',
-          status: 'active',
-          joinDate: new Date('2024-01-15'),
-          tournamentsPlayed: 12,
-          winRate: 68.5
-        },
-        {
-          id: '2',
-          name: 'Sarah Johnson',
-          email: 'sarah.j@email.com',
-          phone: '+1-555-0456',
-          skillLevel: 'intermediate',
-          status: 'active',
-          joinDate: new Date('2024-03-22'),
-          tournamentsPlayed: 8,
-          winRate: 45.2
-        },
-        {
-          id: '3',
-          name: 'Mike Wilson',
-          email: 'mike.wilson@email.com',
-          skillLevel: 'professional',
-          status: 'suspended',
-          joinDate: new Date('2023-11-08'),
-          tournamentsPlayed: 25,
-          winRate: 82.1
-        },
-        {
-          id: '4',
-          name: 'Emma Davis',
-          email: 'emma.davis@email.com',
-          phone: '+1-555-0789',
-          skillLevel: 'beginner',
-          status: 'active',
-          joinDate: new Date('2024-06-10'),
-          tournamentsPlayed: 3,
-          winRate: 33.3
-        }
-      ],
+      players: [],
       showAddForm: false,
       newPlayer: {
         name: '',
@@ -82,8 +42,35 @@ export class PlayerManagement extends BaseComponentComplete<PlayerManagementProp
         skillLevel: 'beginner'
       },
       searchTerm: '',
-      filterStatus: 'all'
+      filterStatus: 'all',
+      loading: false,
+      error: null
     };
+  }
+
+  componentDidMount() {
+    this.loadPlayers();
+  }
+
+  private async loadPlayers() {
+    this.setState({ loading: true, error: null });
+    try {
+      // Note: API for getting all players doesn't exist yet
+      // For now, we'll show a message that this would fetch from API
+      console.log('Player management: Would fetch players from API here');
+
+      // In the future, this would be:
+      // const response = await matchesApiService.getAllPlayers();
+      // this.setState({ players: response.players, loading: false });
+
+      // For now, keep empty array and show message
+      this.setState({ loading: false });
+    } catch (error) {
+      this.setState({
+        error: error instanceof Error ? error.message : 'Failed to load players',
+        loading: false
+      });
+    }
   }
 
   private handleAddPlayer = (): void => {
@@ -102,34 +89,36 @@ export class PlayerManagement extends BaseComponentComplete<PlayerManagementProp
     });
   };
 
-  private handleSavePlayer = (): void => {
-    const { newPlayer, players } = this.state;
+  private handleSavePlayer = async (): Promise<void> => {
+    const { newPlayer } = this.state;
     if (!newPlayer.name.trim() || !newPlayer.email.trim()) {
       return;
     }
 
-    const player = {
-      id: Date.now().toString(),
-      name: newPlayer.name,
-      email: newPlayer.email,
-      phone: newPlayer.phone || undefined,
-      skillLevel: newPlayer.skillLevel,
-      status: 'active' as const,
-      joinDate: new Date(),
-      tournamentsPlayed: 0,
-      winRate: 0
-    };
+    this.setState({ loading: true, error: null });
+    try {
+      // Note: API for creating players doesn't exist yet, so we'll show a message
+      // In the future, this would call: await matchesApiService.createPlayer(playerData);
+      alert('Player creation API not yet implemented. This would create a player via the backend API.');
 
-    this.setState({
-      players: [...players, player],
-      showAddForm: false,
-      newPlayer: {
-        name: '',
-        email: '',
-        phone: '',
-        skillLevel: 'beginner'
-      }
-    });
+      // For now, just reload players to show any changes
+      await this.loadPlayers();
+
+      this.setState({
+        showAddForm: false,
+        newPlayer: {
+          name: '',
+          email: '',
+          phone: '',
+          skillLevel: 'beginner'
+        }
+      });
+    } catch (error) {
+      this.setState({
+        error: error instanceof Error ? error.message : 'Failed to create player',
+        loading: false
+      });
+    }
   };
 
   private handleInputChange = (field: keyof PlayerManagementState['newPlayer'], value: string): void => {
@@ -179,7 +168,7 @@ export class PlayerManagement extends BaseComponentComplete<PlayerManagementProp
   };
 
   render(): React.ReactNode {
-    const { showAddForm, newPlayer, searchTerm, filterStatus } = this.state;
+    const { showAddForm, newPlayer, searchTerm, filterStatus, loading, error } = this.state;
     const filteredPlayers = this.getFilteredPlayers();
 
     return (
@@ -188,13 +177,14 @@ export class PlayerManagement extends BaseComponentComplete<PlayerManagementProp
           <h2 style={{ margin: 0, color: '#ffffff' }}>Player Management</h2>
           <button
             onClick={this.handleAddPlayer}
+            disabled={loading}
             style={{
               padding: '0.5rem 1rem',
-              backgroundColor: '#3b82f6',
+              backgroundColor: loading ? '#6b7280' : '#3b82f6',
               color: 'white',
               border: 'none',
               borderRadius: '0.5rem',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               fontSize: '0.875rem',
               fontWeight: '500'
             }}
@@ -202,6 +192,28 @@ export class PlayerManagement extends BaseComponentComplete<PlayerManagementProp
             Add Player
           </button>
         </div>
+
+        {error && (
+          <div style={{
+            backgroundColor: '#ef4444',
+            color: 'white',
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            marginBottom: '2rem'
+          }}>
+            Error: {error}
+          </div>
+        )}
+
+        {loading && (
+          <div style={{
+            textAlign: 'center',
+            padding: '2rem',
+            color: '#9ca3af'
+          }}>
+            Loading players...
+          </div>
+        )}
 
         {/* Search and Filter */}
         <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', alignItems: 'center' }}>
@@ -421,9 +433,14 @@ export class PlayerManagement extends BaseComponentComplete<PlayerManagementProp
           ))}
         </div>
 
-        {filteredPlayers.length === 0 && (
+        {!loading && filteredPlayers.length === 0 && (
           <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
             <p>No players found matching your criteria.</p>
+            {this.state.players.length === 0 && (
+              <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
+                Players will appear here once registered for tournaments.
+              </p>
+            )}
           </div>
         )}
       </div>

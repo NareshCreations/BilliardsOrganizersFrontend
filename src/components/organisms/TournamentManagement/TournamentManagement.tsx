@@ -1,61 +1,62 @@
 import React from 'react';
 import { BaseComponentComplete } from '../../base/BaseComponent';
+import { matchesApiService, Tournament, TournamentResponse } from '../../../services/matchesApi';
+import authService from '../../../services/authService';
 
 export interface TournamentManagementProps {}
 
 interface TournamentManagementState {
-  tournaments: Array<{
-    id: string;
-    name: string;
-    status: 'upcoming' | 'active' | 'completed';
-    startDate: Date;
-    players: number;
-    maxPlayers: number;
-  }>;
+  tournaments: Tournament[];
   showCreateForm: boolean;
   newTournament: {
     name: string;
     startDate: string;
     maxPlayers: number;
   };
+  loading: boolean;
+  error: string | null;
 }
 
 export class TournamentManagement extends BaseComponentComplete<TournamentManagementProps, TournamentManagementState> {
   protected getInitialState(): TournamentManagementState {
     return {
-      tournaments: [
-        {
-          id: '1',
-          name: 'Spring Championship 2025',
-          status: 'active',
-          startDate: new Date('2025-03-15'),
-          players: 24,
-          maxPlayers: 32
-        },
-        {
-          id: '2',
-          name: 'Summer Open Tournament',
-          status: 'upcoming',
-          startDate: new Date('2025-06-01'),
-          players: 0,
-          maxPlayers: 64
-        },
-        {
-          id: '3',
-          name: 'Winter Classic 2024',
-          status: 'completed',
-          startDate: new Date('2024-12-01'),
-          players: 48,
-          maxPlayers: 48
-        }
-      ],
+      tournaments: [],
       showCreateForm: false,
       newTournament: {
         name: '',
         startDate: '',
         maxPlayers: 32
-      }
+      },
+      loading: false,
+      error: null
     };
+  }
+
+  componentDidMount() {
+    this.loadTournaments();
+  }
+
+  private async loadTournaments() {
+    this.setState({ loading: true, error: null });
+    try {
+      const response: TournamentResponse = await matchesApiService.getTournamentsByOrganizerId();
+      if (response.success && response.data.tournaments) {
+        this.setState({
+          tournaments: response.data.tournaments,
+          loading: false
+        });
+      } else {
+        this.setState({
+          error: response.message || 'Failed to load tournaments',
+          loading: false
+        });
+      }
+    } catch (error) {
+      this.setState({
+        error: error instanceof Error ? error.message : 'Failed to load tournaments',
+        loading: false
+      });
+    }
   }
 
   private handleCreateTournament = (): void => {
@@ -73,30 +74,35 @@ export class TournamentManagement extends BaseComponentComplete<TournamentManage
     });
   };
 
-  private handleSaveTournament = (): void => {
-    const { newTournament, tournaments } = this.state;
+  private handleSaveTournament = async (): Promise<void> => {
+    const { newTournament } = this.state;
     if (!newTournament.name.trim() || !newTournament.startDate) {
       return;
     }
 
-    const tournament = {
-      id: Date.now().toString(),
-      name: newTournament.name,
-      status: 'upcoming' as const,
-      startDate: new Date(newTournament.startDate),
-      players: 0,
-      maxPlayers: newTournament.maxPlayers
-    };
+    this.setState({ loading: true, error: null });
+    try {
+      // Note: API for creating tournaments doesn't exist yet, so we'll show a message
+      // In the future, this would call: await matchesApiService.createTournament(tournamentData);
+      alert('Tournament creation API not yet implemented. This would create a tournament via the backend API.');
 
-    this.setState({
-      tournaments: [...tournaments, tournament],
-      showCreateForm: false,
-      newTournament: {
-        name: '',
-        startDate: '',
-        maxPlayers: 32
-      }
-    });
+      // For now, just reload tournaments to show any changes
+      await this.loadTournaments();
+
+      this.setState({
+        showCreateForm: false,
+        newTournament: {
+          name: '',
+          startDate: '',
+          maxPlayers: 32
+        }
+      });
+    } catch (error) {
+      this.setState({
+        error: error instanceof Error ? error.message : 'Failed to create tournament',
+        loading: false
+      });
+    }
   };
 
   private handleInputChange = (field: keyof TournamentManagementState['newTournament'], value: string | number): void => {
@@ -110,15 +116,17 @@ export class TournamentManagement extends BaseComponentComplete<TournamentManage
 
   private getStatusColor = (status: string): string => {
     switch (status) {
-      case 'active': return '#10b981';
+      case 'ongoing': return '#10b981';
       case 'upcoming': return '#f59e0b';
       case 'completed': return '#6b7280';
+      case 'cancelled': return '#ef4444';
+      case 'draft': return '#6b7280';
       default: return '#6b7280';
     }
   };
 
   render(): React.ReactNode {
-    const { tournaments, showCreateForm, newTournament } = this.state;
+    const { tournaments, showCreateForm, newTournament, loading, error } = this.state;
 
     return (
       <div style={{ padding: '2rem', color: '#ffffff' }}>
@@ -126,13 +134,14 @@ export class TournamentManagement extends BaseComponentComplete<TournamentManage
           <h2 style={{ margin: 0, color: '#ffffff' }}>Tournament Management</h2>
           <button
             onClick={this.handleCreateTournament}
+            disabled={loading}
             style={{
               padding: '0.5rem 1rem',
-              backgroundColor: '#3b82f6',
+              backgroundColor: loading ? '#6b7280' : '#3b82f6',
               color: 'white',
               border: 'none',
               borderRadius: '0.5rem',
-              cursor: 'pointer',
+              cursor: loading ? 'not-allowed' : 'pointer',
               fontSize: '0.875rem',
               fontWeight: '500'
             }}
@@ -140,6 +149,28 @@ export class TournamentManagement extends BaseComponentComplete<TournamentManage
             Create Tournament
           </button>
         </div>
+
+        {error && (
+          <div style={{
+            backgroundColor: '#ef4444',
+            color: 'white',
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            marginBottom: '2rem'
+          }}>
+            Error: {error}
+          </div>
+        )}
+
+        {loading && (
+          <div style={{
+            textAlign: 'center',
+            padding: '2rem',
+            color: '#9ca3af'
+          }}>
+            Loading tournaments...
+          </div>
+        )}
 
         {showCreateForm && (
           <div style={{
@@ -249,7 +280,7 @@ export class TournamentManagement extends BaseComponentComplete<TournamentManage
                 <div>
                   <h3 style={{ margin: 0, color: '#ffffff' }}>{tournament.name}</h3>
                   <p style={{ margin: '0.25rem 0', color: '#9ca3af' }}>
-                    {tournament.startDate.toLocaleDateString()} • {tournament.players}/{tournament.maxPlayers} players
+                    {tournament.startDate ? new Date(tournament.startDate).toLocaleDateString() : 'Date TBD'} • {tournament.currentParticipants}/{tournament.maxParticipants} players • ₹{tournament.entryFee}
                   </p>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -284,6 +315,12 @@ export class TournamentManagement extends BaseComponentComplete<TournamentManage
             </div>
           ))}
         </div>
+
+        {!loading && tournaments.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
+            <p>No tournaments found. Create your first tournament to get started.</p>
+          </div>
+        )}
       </div>
     );
   }

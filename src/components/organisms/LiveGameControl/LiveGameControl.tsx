@@ -1,5 +1,7 @@
 import React from 'react';
 import { BaseComponentComplete } from '../../base/BaseComponent';
+import { matchesApiService } from '../../../services/matchesApi';
+import authService from '../../../services/authService';
 
 export interface LiveGameControlProps {}
 
@@ -16,46 +18,46 @@ interface LiveGameControlState {
   }>;
   selectedGame: string | null;
   showScoreModal: boolean;
+  loading: boolean;
+  error: string | null;
+  selectedTournament: string | null;
 }
 
 export class LiveGameControl extends BaseComponentComplete<LiveGameControlProps, LiveGameControlState> {
   protected getInitialState(): LiveGameControlState {
     return {
-      activeGames: [
-        {
-          id: '1',
-          tournamentName: 'Spring Championship 2025',
-          player1: 'John Smith',
-          player2: 'Sarah Johnson',
-          currentScore: { player1: 8, player2: 6 },
-          status: 'in_progress',
-          startTime: new Date(Date.now() - 1000 * 60 * 45), // 45 minutes ago
-          tableNumber: 1
-        },
-        {
-          id: '2',
-          tournamentName: 'Spring Championship 2025',
-          player1: 'Mike Wilson',
-          player2: 'Emma Davis',
-          currentScore: { player1: 5, player2: 7 },
-          status: 'in_progress',
-          startTime: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-          tableNumber: 2
-        },
-        {
-          id: '3',
-          tournamentName: 'Spring Championship 2025',
-          player1: 'Alex Brown',
-          player2: 'Lisa Chen',
-          currentScore: { player1: 9, player2: 9 },
-          status: 'paused',
-          startTime: new Date(Date.now() - 1000 * 60 * 60), // 1 hour ago
-          tableNumber: 3
-        }
-      ],
+      activeGames: [],
       selectedGame: null,
-      showScoreModal: false
+      showScoreModal: false,
+      loading: false,
+      error: null,
+      selectedTournament: null
     };
+  }
+
+  componentDidMount() {
+    this.loadLiveGames();
+  }
+
+  private async loadLiveGames() {
+    this.setState({ loading: true, error: null });
+    try {
+      // Note: API for getting live games doesn't exist yet
+      // For now, we'll show a message that this would fetch from API
+      console.log('Live game control: Would fetch live games from API here');
+
+      // In the future, this would be:
+      // const response = await matchesApiService.getLiveTournaments();
+      // this.setState({ activeGames: response.games, loading: false });
+
+      // For now, keep empty array and show message
+      this.setState({ loading: false });
+    } catch (error) {
+      this.setState({
+        error: error instanceof Error ? error.message : 'Failed to load live games',
+        loading: false
+      });
+    }
   }
 
   private handlePauseGame = (gameId: string): void => {
@@ -117,7 +119,7 @@ export class LiveGameControl extends BaseComponentComplete<LiveGameControlProps,
   };
 
   render(): React.ReactNode {
-    const { activeGames } = this.state;
+    const { activeGames, loading, error } = this.state;
 
     return (
       <div style={{ padding: '2rem', color: '#ffffff' }}>
@@ -146,6 +148,28 @@ export class LiveGameControl extends BaseComponentComplete<LiveGameControlProps,
             </span>
           </div>
         </div>
+
+        {error && (
+          <div style={{
+            backgroundColor: '#ef4444',
+            color: 'white',
+            padding: '1rem',
+            borderRadius: '0.5rem',
+            marginBottom: '2rem'
+          }}>
+            Error: {error}
+          </div>
+        )}
+
+        {loading && (
+          <div style={{
+            textAlign: 'center',
+            padding: '2rem',
+            color: '#9ca3af'
+          }}>
+            Loading live games...
+          </div>
+        )}
 
         <div style={{ display: 'grid', gap: '1.5rem' }}>
           {activeGames.map((game) => (
@@ -341,10 +365,13 @@ export class LiveGameControl extends BaseComponentComplete<LiveGameControlProps,
           ))}
         </div>
 
-        {activeGames.length === 0 && (
+        {!loading && activeGames.length === 0 && (
           <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
             <p>No active games at the moment.</p>
             <p>Games will appear here when tournaments are in progress.</p>
+            <p style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
+              Select a tournament above to view live games.
+            </p>
           </div>
         )}
       </div>
