@@ -82,18 +82,18 @@ docs/
 Naresh Bkp/
 
 # Scripts (not needed in container)
-scripts/
+# scripts/
 
 # Test files and configs
 *.test.js
 *.test.ts
 *.spec.js
 *.spec.ts
-jest.config.js
-jest.setup.js
-vitest.config.ts
-cypress.config.ts
-playwright.config.ts
+# jest.config.js
+# jest.setup.js
+# vitest.config.ts
+# cypress.config.ts
+# playwright.config.ts
 
 # Config files not needed in container
 .editorconfig
@@ -103,5 +103,5 @@ playwright.config.ts
 .prettierrc
 .stylelintrc.json
 .lintstagedrc.js
-.commitlintrc.js
-.browserslistrc
+# .commitlintrc.js
+# .browserslistrc
