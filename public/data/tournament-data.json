@@ -1,0 +1,210 @@
+{
+  "tournamentId": "tour_001",
+  "tournamentName": "Summer 9-Ball Cup",
+  "tournamentDate": "2024-01-15",
+  "tournamentTime": "10:00 AM",
+  "totalPlayers": 13,
+  "totalRounds": 5,
+  "currentRound": 1,
+  "status": "running",
+  "lobbyPlayers": [
+    {
+      "id": 13,
+      "name": "Vikram Singh",
+      "rank": 13,
+      "rating": 1450,
+      "profilePic": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
+      "skillLevel": "Intermediate",
+      "matchesPlayed": 15,
+      "matchesWon": 8,
+      "winRate": 53.3,
+      "status": "waiting",
+      "reason": "odd_player",
+      "fromRound": 1
+    }
+  ],
+  "matches": [
+    {
+      "id": 1,
+      "round": 1,
+      "player1": {
+        "id": 1,
+        "name": "Rajesh Kumar",
+        "rank": 1,
+        "rating": 1850,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert",
+        "matchesPlayed": 45,
+        "matchesWon": 38,
+        "winRate": 84.4
+      },
+      "player2": {
+        "id": 2,
+        "name": "Suresh Rao",
+        "rank": 7,
+        "rating": 1720,
+        "profilePic": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Advanced",
+        "matchesPlayed": 32,
+        "matchesWon": 24,
+        "winRate": 75.0
+      },
+      "status": "pending",
+      "startTime": null,
+      "endTime": null,
+      "winner": null,
+      "score": null
+    },
+    {
+      "id": 2,
+      "round": 1,
+      "player1": {
+        "id": 3,
+        "name": "Neha Kapoor",
+        "rank": 3,
+        "rating": 1780,
+        "profilePic": "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert",
+        "matchesPlayed": 28,
+        "matchesWon": 22,
+        "winRate": 78.6
+      },
+      "player2": {
+        "id": 4,
+        "name": "Amit Patel",
+        "rank": 5,
+        "rating": 1750,
+        "profilePic": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Advanced",
+        "matchesPlayed": 35,
+        "matchesWon": 28,
+        "winRate": 80.0
+      },
+      "status": "pending",
+      "startTime": null,
+      "endTime": null,
+      "winner": null,
+      "score": null
+    },
+    {
+      "id": 3,
+      "round": 1,
+      "player1": {
+        "id": 5,
+        "name": "Sneha Reddy",
+        "rank": 28,
+        "rating": 1450,
+        "profilePic": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Intermediate",
+        "matchesPlayed": 18,
+        "matchesWon": 12,
+        "winRate": 66.7
+      },
+      "player2": {
+        "id": 6,
+        "name": "Vikram Singh",
+        "rank": 2,
+        "rating": 1820,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Expert",
+        "matchesPlayed": 42,
+        "matchesWon": 35,
+        "winRate": 83.3
+      },
+      "status": "pending",
+      "startTime": null,
+      "endTime": null,
+      "winner": null,
+      "score": null
+    },
+    {
+      "id": 4,
+      "round": 1,
+      "player1": {
+        "id": 7,
+        "name": "Gaurav Chawla",
+        "rank": 21,
+        "rating": 1520,
+        "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Intermediate",
+        "matchesPlayed": 25,
+        "matchesWon": 16,
+        "winRate": 64.0
+      },
+      "player2": {
+        "id": 8,
+        "name": "Shruti Jain",
+        "rank": 11,
+        "rating": 1650,
+        "profilePic": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face",
+        "skillLevel": "Advanced",
+        "matchesPlayed": 30,
+        "matchesWon": 21,
+        "winRate": 70.0
+      },
+      "status": "pending",
+      "startTime": null,
+      "endTime": null,
+      "winner": null,
+      "score": null
+    }
+  ],
+  "rounds": [
+    {
+      "roundNumber": 1,
+      "matchCount": 6,
+      "players": 12,
+      "isCompleted": false,
+      "matches": [],
+      "winners": [],
+      "isShuffled": false
+    },
+    {
+      "roundNumber": 2,
+      "matchCount": 3,
+      "players": 6,
+      "isCompleted": false,
+      "matches": [],
+      "winners": [],
+      "isShuffled": false
+    },
+    {
+      "roundNumber": 3,
+      "matchCount": 1,
+      "players": 2,
+      "isCompleted": false,
+      "matches": [],
+      "winners": [],
+      "isShuffled": false
+    },
+    {
+      "roundNumber": 4,
+      "matchCount": 1,
+      "players": 2,
+      "isCompleted": false,
+      "matches": [],
+      "winners": [],
+      "isShuffled": false
+    },
+    {
+      "roundNumber": 5,
+      "matchCount": 1,
+      "players": 2,
+      "isCompleted": false,
+      "matches": [],
+      "winners": [],
+      "isShuffled": false
+    }
+  ],
+  "matchResults": {},
+  "roundWinners": {},
+  "closedMatches": {},
+  "tournamentStats": {
+    "totalMatches": 12,
+    "completedMatches": 0,
+    "remainingMatches": 12,
+    "averageMatchDuration": "25 minutes",
+    "longestMatch": "45 minutes",
+    "shortestMatch": "12 minutes"
+  }
+}

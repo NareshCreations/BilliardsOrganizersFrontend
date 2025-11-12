@@ -1,0 +1,15 @@
+name: billiards-prod
+
+services:
+  billiards-ui-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: billiards-ui-prod
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    # env_file:
+    #   - .env.prod
