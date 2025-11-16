@@ -31,10 +31,10 @@ export const AUTH_CONFIG = {
   } as const,
 
   // Routes that require authentication
-  PROTECTED_ROUTES: [
-    '/dashboard',
-    '/matches',
-    '/profile',
+    PROTECTED_ROUTES: [
+      '/dashboard',
+      '/tournaments',
+      '/profile',
     '/game-organization',
     '/tournament-running',
   ],

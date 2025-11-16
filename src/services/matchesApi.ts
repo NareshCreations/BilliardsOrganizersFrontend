@@ -349,6 +349,125 @@ class MatchesApiService {
     }
   }
 
+  // Create Tournament API
+  // POST /api/v1/organizers/tournaments
+  // Token is passed in Authorization header as Bearer token
+  async createTournament(tournamentData: {
+    tournamentName: string;
+    gameType: string;
+    tournamentDate: string;
+    tournamentTime: string;
+    maxPlayers: number;
+    entryFee: number;
+    prizePool: number;
+    description?: string;
+    registrationDeadline?: string;
+  }): Promise<any> {
+    try {
+      console.log('🏆 Calling Create Tournament API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('📝 Tournament Data:', tournamentData);
+      
+      const url = `${this.apiBaseUrl}/organizers/tournaments`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: POST');
+      console.log('🔐 Using Authorization Bearer token from authService');
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(tournamentData),
+      });
+      
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Tournament created successfully');
+      console.log('📦 Response data:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Create tournament API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      throw error;
+    }
+  }
+
+  // Delete Tournament API
+  // DELETE /api/v1/organizers/tournaments/{tournament_id}
+  // Token is passed in Authorization header as Bearer token
+  async deleteTournament(tournamentId: string): Promise<any> {
+    try {
+      console.log('🗑️ Calling Delete Tournament API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: DELETE');
+      console.log('🔐 Using Authorization Bearer token from authService');
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Tournament deleted successfully');
+      console.log('📦 Response data:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Delete tournament API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      throw error;
+    }
+  }
+
   // Get Tournament API (includes registered players and tournament status)
   // GET /api/v1/organizers/tournaments/{tournament_id}
   // Token is passed in Authorization header as Bearer token
@@ -535,6 +654,449 @@ class MatchesApiService {
     }
   }
 
+  // Move Players to Round API
+  // POST /api/v1/organizers/tournaments/{tournament_id}/rounds/{round_id}/players
+  // Requires Authorization Bearer token in header
+  async movePlayersToRound(tournamentId: string, roundId: string, playerIds: string[]): Promise<any> {
+    try {
+      console.log('🎯 Calling move players to round API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      console.log('🎲 Round ID:', roundId);
+      console.log('👥 Player IDs:', playerIds);
+      
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/rounds/${roundId}/players`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: POST');
+      console.log('🔐 Using Authorization Bearer token from authService');
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playerIds: playerIds
+        }),
+      });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        console.log('❌ Unauthorized request (401), token expired or invalid');
+        console.log('🔐 Logging out user and redirecting to login page...');
+        authService.logout();
+        window.location.href = '/login';
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+        
+        // Try to parse error as JSON
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Players moved to round successfully');
+      console.log('📦 Response data:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Move players to round API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      throw error;
+    }
+  }
+
+  // Remove Players from Round API
+  // DELETE /api/v1/organizers/tournaments/{tournament_id}/rounds/{round_id}/players/remove
+  // Requires Authorization Bearer token in header
+  async removePlayersFromRound(tournamentId: string, roundId: string, playerIds: string[]): Promise<any> {
+    try {
+      console.log('🗑️ Calling remove players from round API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      console.log('🎲 Round ID:', roundId);
+      console.log('👥 Player IDs:', playerIds);
+      
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/rounds/${roundId}/players/remove`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: DELETE');
+      console.log('🔐 Using Authorization Bearer token from authService');
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          playerIds: playerIds
+        }),
+      });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        console.log('❌ Unauthorized request (401), token expired or invalid');
+        console.log('🔐 Logging out user and redirecting to login page...');
+        authService.logout();
+        window.location.href = '/login';
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+        
+        // Try to parse error as JSON
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Players removed from round successfully');
+      console.log('📦 Response data:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Remove players from round API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      throw error;
+    }
+  }
+
+  // Delete Round API
+  // DELETE /api/v1/organizers/tournaments/{tournament_id}/rounds/{round_id}
+  // Requires Authorization Bearer token in header
+  async deleteRound(tournamentId: string, roundId: string): Promise<any> {
+    try {
+      console.log('🗑️ Calling delete round API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      console.log('🎲 Round ID:', roundId);
+
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/rounds/${roundId}`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: DELETE');
+
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        console.log('❌ Unauthorized request (401), token expired or invalid');
+        console.log('🔐 Logging out user and redirecting to login page...');
+        authService.logout();
+        window.location.href = '/login';
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+
+        // Try to parse error as JSON
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Round deleted successfully');
+      console.log('📦 Response data:', data);
+
+      return data;
+    } catch (error) {
+      console.error('❌ Delete round API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+
+      throw error;
+    }
+  }
+
+  // Start Match API
+  // POST /api/v1/organizers/tournaments/{tournament_id}/rounds/{round_id}/matches
+  // Requires Authorization Bearer token in header
+  async startMatch(tournamentId: string, roundId: string, player1Id: string, player2Id: string, tableNumber?: number): Promise<any> {
+    try {
+      console.log('🎮 Calling start match API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      console.log('🎲 Round ID:', roundId);
+      console.log('👤 Player 1 ID:', player1Id);
+      console.log('👤 Player 2 ID:', player2Id);
+      console.log('🪑 Table Number:', tableNumber);
+      
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/rounds/${roundId}/matches`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: POST');
+      console.log('🔐 Using Authorization Bearer token from authService');
+      
+      const requestBody: any = {
+        player1Id: player1Id,
+        player2Id: player2Id
+      };
+      
+      if (tableNumber !== undefined) {
+        requestBody.tableNumber = tableNumber;
+      }
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+      console.log('📥 Response statusText:', response.statusText);
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        console.log('❌ Unauthorized request (401), token expired or invalid');
+        console.log('🔐 Logging out user and redirecting to login page...');
+        authService.logout();
+        window.location.href = '/login';
+        throw new Error('Session expired. Please login again.');
+      }
+
+      // Read response body once (can only be read once)
+      const responseText = await response.text();
+      console.log('📥 Raw response text:', responseText);
+      console.log('📥 Response text length:', responseText.length);
+
+      // Check if response is successful (200, 201, etc.)
+      if (!response.ok) {
+        console.error('❌ API error response status:', response.status);
+        console.error('❌ API error response body:', responseText);
+        
+        // Try to parse error as JSON
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          errorData = { message: responseText || `HTTP error! status: ${response.status}` };
+        }
+        
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      // Parse response body
+      let data;
+      try {
+        if (responseText && responseText.trim()) {
+          data = JSON.parse(responseText);
+        } else {
+          // Empty response - might be 201 Created with no body
+          console.warn('⚠️ Empty response body, creating default response');
+          data = {
+            success: response.status === 201 || response.status === 200,
+            message: response.status === 201 ? 'Match created successfully' : 'Match started successfully',
+            data: {}
+          };
+        }
+      } catch (parseError) {
+        console.error('❌ Error parsing response JSON:', parseError);
+        console.error('❌ Response text that failed to parse:', responseText);
+        throw new Error(`Invalid response from server: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+      }
+
+      console.log('✅ Match API call successful');
+      console.log('📦 Parsed response data:', data);
+      
+      // Ensure response has success field
+      if (data.success === undefined) {
+        // If no success field, assume success for 200/201 status
+        data.success = response.status === 200 || response.status === 201;
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Start match API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      throw error;
+    }
+  }
+
+  // Complete/Close Match API
+  // PATCH /api/v1/organizers/tournaments/{tournament_id}/rounds/{round_id}/matches/{match_id}
+  // Requires Authorization Bearer token in header
+  async completeMatch(
+    tournamentId: string,
+    roundId: string,
+    matchId: string,
+    winnerId: string,
+    scorePlayer1: number,
+    scorePlayer2: number
+  ): Promise<any> {
+    try {
+      console.log('🏁 Calling complete match API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      console.log('🎲 Round ID:', roundId);
+      console.log('🎮 Match ID:', matchId);
+      console.log('👑 Winner ID:', winnerId);
+      console.log('📊 Score Player 1:', scorePlayer1);
+      console.log('📊 Score Player 2:', scorePlayer2);
+
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/rounds/${roundId}/matches/${matchId}`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: PATCH (trying PATCH first, will fallback to PUT if needed)');
+      console.log('🔐 Using Authorization Bearer token from authService');
+
+      const requestBody = {
+        winnerId: winnerId,
+        scorePlayer1: scorePlayer1,
+        scorePlayer2: scorePlayer2
+      };
+
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+      console.log('📥 Response statusText:', response.statusText);
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        console.log('❌ Unauthorized request (401), token expired or invalid');
+        console.log('🔐 Logging out user and redirecting to login page...');
+        authService.logout();
+        window.location.href = '/login';
+        throw new Error('Session expired. Please login again.');
+      }
+
+      // Read response body once (can only be read once)
+      const responseText = await response.text();
+      console.log('📥 Raw response text:', responseText);
+      console.log('📥 Response text length:', responseText.length);
+
+      // Check if response is successful (200, 201, etc.)
+      if (!response.ok) {
+        console.error('❌ API error response status:', response.status);
+        console.error('❌ API error response body:', responseText);
+
+        // Check if response is HTML (backend error page)
+        if (responseText.trim().startsWith('<!DOCTYPE') || responseText.trim().startsWith('<html')) {
+          // Extract error message from HTML if possible
+          const errorMatch = responseText.match(/<pre[^>]*>([^<]+)<\/pre>/i) || 
+                            responseText.match(/<body[^>]*>([^<]+)<\/body>/i) ||
+                            responseText.match(/Cannot (GET|POST|PUT|PATCH|DELETE) ([^\s]+)/i);
+          
+          if (errorMatch) {
+            const errorMessage = errorMatch[1] || errorMatch[0];
+            console.error('❌ Extracted error from HTML:', errorMessage);
+            throw new Error(`Backend route error: ${errorMessage}. Please check if the API endpoint exists and supports PATCH method.`);
+          } else {
+            throw new Error(`Backend returned HTML error page. Status: ${response.status}. The API endpoint may not exist or may not support PATCH method.`);
+          }
+        }
+
+        // Try to parse error as JSON
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          errorData = { message: responseText || `HTTP error! status: ${response.status}` };
+        }
+
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      // Parse response body
+      let data;
+      try {
+        if (responseText && responseText.trim()) {
+          data = JSON.parse(responseText);
+        } else {
+          // Empty response - might be 200 OK with no body
+          console.warn('⚠️ Empty response body, creating default response');
+          data = {
+            success: response.status === 200,
+            message: 'Match completed successfully',
+            data: {}
+          };
+        }
+      } catch (parseError) {
+        console.error('❌ Error parsing response JSON:', parseError);
+        console.error('❌ Response text that failed to parse:', responseText);
+        throw new Error(`Invalid response from server: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`);
+      }
+
+      console.log('✅ Match completion API call successful');
+      console.log('📦 Parsed response data:', data);
+
+      // Ensure response has success field
+      if (data.success === undefined) {
+        // If no success field, assume success for 200 status
+        data.success = response.status === 200;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('❌ Complete match API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+
+      throw error;
+    }
+  }
+
   // Start Tournament API
   // PATCH /api/v1/organizers/tournaments/{tournament_id}/start
   // Requires Authorization Bearer token in header
@@ -602,6 +1164,120 @@ class MatchesApiService {
         name: error instanceof Error ? error.name : 'Unknown'
       });
       
+      throw error;
+    }
+  }
+
+  // Save Winner Titles API
+  // POST /api/v1/organizers/tournaments/{tournament_id}/winners
+  // Requires Authorization Bearer token in header
+  async saveWinnerTitles(tournamentId: string, winners: Array<{
+    customerId: string;
+    rank: number;
+    title: string;
+    isCustomTitle?: boolean;
+    displayInResults?: boolean;
+  }>): Promise<any> {
+    try {
+      console.log('🏆 Calling save winner titles API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      console.log('🏆 Winners:', winners);
+
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/winners`;
+      console.log('🌐 Full API URL:', url);
+      console.log('🌐 Request body:', JSON.stringify({ winners: winners }, null, 2));
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ winners: winners }),
+      });
+      
+      console.log('🌐 API Response status:', response.status);
+      console.log('🌐 API Response ok:', response.ok);
+
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorMessage;
+        } catch (e) {
+          // If response is not JSON, try to get text
+          try {
+            const errorText = await response.text();
+            if (errorText) {
+              // Try to extract error message from HTML if it's an HTML error page
+              const match = errorText.match(/<title[^>]*>([^<]+)<\/title>/i) || errorText.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+              if (match) {
+                errorMessage = match[1];
+              } else if (errorText.length < 200) {
+                errorMessage = errorText;
+              }
+            }
+          } catch (textError) {
+            console.error('Error reading error response as text:', textError);
+          }
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log('✅ Save winner titles API response:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Error saving winner titles:', error);
+      throw error;
+    }
+  }
+
+  async closeTournament(tournamentId: string): Promise<any> {
+    try {
+      console.log('🔒 Calling close tournament API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🔒 Tournament ID:', tournamentId);
+
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/close`;
+      console.log('🌐 Full API URL:', url);
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      
+      console.log('🌐 API Response status:', response.status);
+      console.log('🌐 API Response ok:', response.ok);
+
+      if (!response.ok) {
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          // Try to read as JSON first
+          const errorText = await response.text();
+          try {
+            const errorData = JSON.parse(errorText);
+            errorMessage = errorData.message || errorMessage;
+          } catch (parseError) {
+            // Not JSON, try to extract error from HTML
+            if (errorText) {
+              const match = errorText.match(/<title[^>]*>([^<]+)<\/title>/i) || errorText.match(/<h1[^>]*>([^<]+)<\/h1>/i);
+              if (match) {
+                errorMessage = match[1];
+              } else if (errorText.length < 200) {
+                errorMessage = errorText;
+              }
+            }
+          }
+        } catch (textError) {
+          console.error('Error reading error response:', textError);
+        }
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log('✅ Close tournament API response:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Error closing tournament:', error);
       throw error;
     }
   }

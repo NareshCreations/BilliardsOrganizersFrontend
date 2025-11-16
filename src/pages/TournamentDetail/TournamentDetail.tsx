@@ -75,7 +75,7 @@ export class TournamentDetail extends React.Component<{}, TournamentDetailState>
   };
 
   private handleBackClick = (): void => {
-    window.location.href = '/matches';
+    window.location.href = '/tournaments';
   };
 
   private handleEditTournament = (): void => {

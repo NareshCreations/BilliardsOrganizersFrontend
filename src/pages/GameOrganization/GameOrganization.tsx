@@ -145,7 +145,7 @@ export class GameOrganization extends BaseComponent<{}, GameOrganizationState> {
   };
 
   private handleBackToMatches = (): void => {
-    window.location.href = '/matches';
+    window.location.href = '/tournaments';
   };
 
   render() {

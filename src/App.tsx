@@ -38,7 +38,7 @@ class App extends Component {
               }
             />
             <Route 
-              path="/matches" 
+              path="/tournaments" 
               element={
                 <ProtectedRoute>
                   <Matches />
