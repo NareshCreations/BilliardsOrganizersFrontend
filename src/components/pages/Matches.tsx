@@ -395,6 +395,34 @@ selectedRoundDisplayName: '',
     this.loadData();
   }
 
+  /**
+   * Helper method to check if an error indicates session expiration
+   * Returns true if the error is a session expired error (should redirect to login)
+   */
+  private isSessionExpiredError(error: any): boolean {
+    const errorMessage = error instanceof Error ? error.message : String(error || '');
+    return errorMessage.includes('Session expired') || 
+           errorMessage.includes('Unauthorized') || 
+           errorMessage.includes('401') ||
+           errorMessage.includes('Invalid or expired token') ||
+           errorMessage.includes('token expired') ||
+           errorMessage.includes('expired token');
+  }
+
+  /**
+   * Helper method to handle errors - redirects to login if session expired, otherwise shows alert
+   */
+  private handleError(error: any, defaultMessage: string, alertTitle: string = 'Error'): void {
+    if (this.isSessionExpiredError(error)) {
+      console.log('🔐 Session expired, redirecting to login...');
+      // Don't show alert, redirect is already handled by API or will be handled by authService
+      return;
+    }
+    
+    const errorMessage = error instanceof Error ? error.message : defaultMessage;
+    this.showCustomAlert(alertTitle, errorMessage);
+  }
+
   private async loadData() {
     this.setState({ loading: true, error: null });
     try {
@@ -775,8 +803,12 @@ selectedRoundDisplayName: '',
       }
     } catch (error) {
       console.error('❌ Error creating tournament:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create tournament';
       this.setState({ loading: false });
+      if (this.isSessionExpiredError(error)) {
+        console.log('🔐 Session expired, redirecting to login...');
+        return;
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create tournament';
       this.showCustomAlert('Error', `Failed to create tournament: ${errorMessage}`);
     }
   };
@@ -2745,8 +2777,12 @@ selectedRoundDisplayName: '',
       }
     } catch (error) {
       console.error('❌ Error deleting tournament:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete tournament';
       this.setState({ loading: false });
+      if (this.isSessionExpiredError(error)) {
+        console.log('🔐 Session expired, redirecting to login...');
+        return;
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete tournament';
       this.showCustomAlert('Error', `Failed to delete tournament: ${errorMessage}`);
     }
   };
@@ -3368,9 +3404,14 @@ selectedRoundDisplayName: '',
     } catch (error) {
       console.error('❌ Error starting match:', error);
       this.setState({ loading: false });
+      if (this.isSessionExpiredError(error)) {
+        console.log('🔐 Session expired, redirecting to login...');
+        return;
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.showCustomAlert(
         'Error Starting Match',
-        `Failed to start match: ${error instanceof Error ? error.message : 'Unknown error'}`
+        `Failed to start match: ${errorMessage}`
       );
     }
   };
@@ -3804,9 +3845,14 @@ selectedRoundDisplayName: '',
     } catch (error) {
       console.error('❌ Error completing match:', error);
       this.setState({ loading: false });
+      if (this.isSessionExpiredError(error)) {
+        console.log('🔐 Session expired, redirecting to login...');
+        return;
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Failed to complete match';
       this.showCustomAlert(
         'Error Completing Match',
-        `Failed to complete match: ${error instanceof Error ? error.message : 'Unknown error'}\n\nPlease try again.`
+        `Failed to complete match: ${errorMessage}\n\nPlease try again.`
       );
     }
   };
@@ -4277,6 +4323,10 @@ selectedRoundDisplayName: '',
         } catch (error) {
           console.error('❌ Failed to delete round via API:', error);
           this.setState({ loading: false });
+          if (this.isSessionExpiredError(error)) {
+            console.log('🔐 Session expired, redirecting to login...');
+            return;
+          }
           const errorMessage = error instanceof Error ? error.message : 'Failed to delete round';
           this.showCustomAlert('Error Deleting Round', errorMessage);
         }
@@ -4362,6 +4412,10 @@ selectedRoundDisplayName: '',
         }
       } catch (err) {
         console.error('❌ Delete round API failed:', err);
+        if (this.isSessionExpiredError(err)) {
+          console.log('🔐 Session expired, redirecting to login...');
+          return;
+        }
         const message = err instanceof Error ? err.message : 'Failed to delete round';
         this.showCustomAlert('Error Deleting Round', message);
       } finally {
