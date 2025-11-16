@@ -360,8 +360,12 @@ Default expected URL: http://localhost:3002/api/v1`;
     console.log('  - Is expired:', now >= expiryDate);
     
     if (now >= expiryDate) {
-      console.log('⚠️ Token expired, clearing auth data');
+      console.log('⚠️ Token expired, clearing auth data and redirecting to login');
       this.logout();
+      // Redirect to login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
       return false;
     }
 
