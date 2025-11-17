@@ -12,6 +12,7 @@ import MatchDetails from './pages/MatchDetails/MatchDetails';
 import { GameOrganization } from './pages/GameOrganization';
 import { TournamentRunning } from './pages/TournamentRunning';
 import UserProfile from './components/auth/UserProfile';
+import { OrganizerProfile } from './pages/OrganizerProfile';
 
 
 
@@ -83,7 +84,15 @@ class App extends Component {
                 <ProtectedRoute>
                   <UserProfile />
                 </ProtectedRoute>
-              } 
+              }
+            />
+            <Route 
+              path="/organizer-profile" 
+              element={
+                <ProtectedRoute>
+                  <OrganizerProfile />
+                </ProtectedRoute>
+              }
             />
           </Routes>
         </Router>

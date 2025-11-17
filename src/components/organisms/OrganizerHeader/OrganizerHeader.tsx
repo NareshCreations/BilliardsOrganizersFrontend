@@ -28,6 +28,9 @@ interface OrganizerHeaderState {
  * Top navigation bar for the organizer portal
  */
 export class OrganizerHeader extends BaseComponentComplete<OrganizerHeaderProps, OrganizerHeaderState> {
+  private dropdownRef = React.createRef<HTMLDivElement>();
+  private profileButtonRef = React.createRef<HTMLButtonElement>();
+
   /**
    * Get initial state for the header
    */
@@ -37,6 +40,39 @@ export class OrganizerHeader extends BaseComponentComplete<OrganizerHeaderProps,
       isProfileDropdownOpen: false
     };
   }
+
+  /**
+   * Component mount - add click outside handler
+   */
+  protected onComponentMount(): void {
+    document.addEventListener('click', this.handleClickOutside);
+  }
+
+  /**
+   * Component unmount - remove click outside handler
+   */
+  protected onComponentUnmount(): void {
+    document.removeEventListener('click', this.handleClickOutside);
+  }
+
+  /**
+   * Handle clicks outside the dropdown
+   */
+  private handleClickOutside = (event: MouseEvent): void => {
+    const target = event.target as Node;
+    // Use setTimeout to ensure button clicks are processed first
+    setTimeout(() => {
+      if (
+        this.state.isProfileDropdownOpen &&
+        this.dropdownRef.current &&
+        this.profileButtonRef.current &&
+        !this.dropdownRef.current.contains(target) &&
+        !this.profileButtonRef.current.contains(target)
+      ) {
+        this.setState({ isProfileDropdownOpen: false });
+      }
+    }, 0);
+  };
 
   /**
    * Handle menu toggle
@@ -63,9 +99,34 @@ export class OrganizerHeader extends BaseComponentComplete<OrganizerHeaderProps,
   /**
    * Handle profile click
    */
-  private handleProfileClick = (): void => {
-    this.props.onProfileClick?.();
+  private handleProfileClick = (e: React.MouseEvent<HTMLButtonElement>): void => {
+    console.log('🔵🔵🔵 Profile Settings button clicked!', e);
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Close dropdown first
     this.setState({ isProfileDropdownOpen: false });
+    
+    // Small delay to ensure dropdown closes, then navigate
+    setTimeout(() => {
+      console.log('🔵 Dropdown closed, now navigating...');
+      
+      // Call the prop handler if provided (for custom navigation)
+      if (this.props.onProfileClick) {
+        console.log('🔵 Using custom onProfileClick handler');
+        try {
+          this.props.onProfileClick();
+        } catch (error) {
+          console.error('❌ Error in onProfileClick handler:', error);
+          // Fallback to window.location
+          window.location.href = '/organizer-profile';
+        }
+      } else {
+        // Default navigation
+        console.log('🔵 Navigating to /organizer-profile using window.location...');
+        window.location.href = '/organizer-profile';
+      }
+    }, 100);
   };
 
   /**
@@ -125,6 +186,7 @@ export class OrganizerHeader extends BaseComponentComplete<OrganizerHeaderProps,
     return (
       <div className={styles.userProfile}>
         <button 
+          ref={this.profileButtonRef}
           className={styles.profileButton}
           onClick={this.handleProfileToggle}
         >
@@ -151,7 +213,14 @@ export class OrganizerHeader extends BaseComponentComplete<OrganizerHeaderProps,
         </button>
 
         {isProfileDropdownOpen && (
-          <div className={styles.profileDropdown}>
+          <div 
+            ref={this.dropdownRef}
+            className={styles.profileDropdown}
+            onClick={(e) => {
+              // Prevent clicks inside dropdown from bubbling up and closing it
+              e.stopPropagation();
+            }}
+          >
             <div className={styles.dropdownHeader}>
               <div className={styles.dropdownAvatar}>
                 {user?.avatar ? (
@@ -169,7 +238,18 @@ export class OrganizerHeader extends BaseComponentComplete<OrganizerHeaderProps,
             </div>
             
             <div className={styles.dropdownMenu}>
-              <button className={styles.dropdownItem} onClick={this.handleProfileClick}>
+              <button 
+                className={styles.dropdownItem} 
+                onClick={(e) => {
+                  console.log('🔵🔵🔵 Direct onClick handler fired!');
+                  this.handleProfileClick(e);
+                }}
+                type="button"
+                onMouseDown={(e) => {
+                  console.log('🔵 Mouse down on Profile Settings button');
+                  // Don't prevent default on mousedown, let the click handler work
+                }}
+              >
                 <svg viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
                 </svg>

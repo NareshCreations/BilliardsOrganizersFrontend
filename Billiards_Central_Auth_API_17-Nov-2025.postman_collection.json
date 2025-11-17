@@ -1,8 +1,8 @@
 {
 	"info": {
 		"_postman_id": "billiards-central-auth-api",
-		"name": "Billiards Central Auth API - 16-Nov-2025",
-		"description": "Complete API collection for Billiards Central Authentication Service (Local Development).\n\n**Deployment:**\n- Base URL: http://localhost:3005\n- Environment: Local Development\n\n**Features:**\n- User Registration (Email, Phone, Org ID)\n- Authentication (Customer & Organizer login with email, phone, or org_id)\n- Tournament management (Create tournament, Get tournaments, Delete tournament, Get status, Start tournament, Close tournament, Get registered players, Get tournament, Create rounds, Move players to round, Remove players from round, Move players between rounds, Start match, Complete match, Save winner titles)\n- Customer portal (Get tournament, Register for tournament)\n- Public endpoints (Get active organizers, Get organizer tournaments)\n- Token-based authentication (Header or Body)\n- Automatic variable management (access_token, tournament_id, organizer_id, round_id, from_round_id, to_round_id, match_id)\n\n**Usage:**\n1. Register users using 'Register Customer' or 'Register Organizer'\n2. Login to authenticate and get tokens\n3. Tokens are automatically saved to collection variables\n4. Create tournaments using 'Create Tournament' API (tournament ID auto-generated if not provided)\n5. Tournament IDs are automatically captured for easy testing\n6. Start tournament before creating rounds (tournament status must be 'started')\n7. Create rounds, then move registered players to specific rounds\n8. Remove players from rounds as needed\n9. Move players between rounds using atomic transaction\n10. Start matches between players in a round (both players must be in the round)\n11. Complete matches by selecting winner and entering scores\n12. Save winner titles with rankings and custom titles\n13. Close tournament when completed\n14. Delete tournament if needed (all related data will be deleted via CASCADE)\n15. Customers can get tournament details using 'Get Tournament' API\n16. Customers can register for tournaments using 'Register for Tournament' API",
+		"name": "Billiards Central Auth API - 18-Nov-2025",
+		"description": "Complete API collection for Billiards Central Authentication Service (Local Development).\n\n**Deployment:**\n- Base URL: http://localhost:3005\n- Environment: Local Development\n\n**Features:**\n- User Registration (Email, Phone, Org ID)\n- Authentication (Customer & Organizer login with email, phone, or org_id)\n- Tournament management (Create tournament, Get tournaments, Delete tournament, Get status, Start tournament, Close tournament, Get registered players, Get tournament, Create rounds, Move players to round, Remove players from round, Move players between rounds, Delete round, Start match, Complete match, Save winner titles)\n- Customer portal (Get tournament, Register for tournament, Get profile, Update profile with Cloudinary file upload)\n- Organizer portal (Get profile, Update profile with Cloudinary file upload)\n- Public endpoints (Get active organizers, Get organizer tournaments)\n- Token-based authentication (Header or Body)\n- Automatic variable management (access_token, tournament_id, organizer_id, round_id, from_round_id, to_round_id, match_id)\n- Cloudinary integration for profile picture uploads\n\n**Usage:**\n1. Register users using 'Register Customer' or 'Register Organizer'\n2. Login to authenticate and get tokens\n3. Tokens are automatically saved to collection variables\n4. Create tournaments using 'Create Tournament' API (tournament ID auto-generated if not provided)\n5. Tournament IDs are automatically captured for easy testing\n6. Start tournament before creating rounds (tournament status must be 'started')\n7. Create rounds, then move registered players to specific rounds\n8. Remove players from rounds as needed\n9. Move players between rounds using atomic transaction\n10. Delete rounds if needed (all related matches and participants will be deleted via CASCADE)\n11. Start matches between players in a round (both players must be in the round)\n12. Complete matches by selecting winner and entering scores\n13. Save winner titles with rankings and custom titles\n14. Close tournament when completed\n15. Delete tournament if needed (all related data will be deleted via CASCADE)\n16. Customers can get tournament details using 'Get Tournament' API\n17. Customers can register for tournaments using 'Register for Tournament' API\n18. Customers can get their profile using 'Get Profile' API\n19. Customers can update their profile using 'Update Profile' API (all fields optional, supports file upload via Cloudinary)\n20. Organizers can get their profile using 'Get Profile' API\n21. Organizers can update their profile using 'Update Profile' API (all fields optional, supports file upload via Cloudinary)",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "billiards-auth",
 		"version": "1.0.0"
@@ -2472,6 +2472,180 @@
 							"body": "{\n  \"success\": false,\n  \"message\": \"User is not an organizer\"\n}"
 						}
 					]
+				},
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{access_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/organizers/profile",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "organizers", "profile" ]
+						},
+						"description": "Get organizer profile. Returns the current organizer's profile information including all profile fields. Requires valid organizer token.\n\n**Response Fields:**\n- `id` (uuid): Organizer profile ID\n- `userId` (uuid): User ID\n- `orgId` (string): Organization ID (format: ORG####)\n- `organizationName` (string): Organization name\n- `contactPersonName` (string, nullable): Contact person name\n- `phone` (string, nullable): Phone number\n- `email` (string, nullable): Email address\n- `city` (string, nullable): City\n- `state` (string, nullable): State\n- `country` (string, nullable): Country\n- `isPremium` (boolean): Premium status\n- `profilePicUrl` (string, nullable): Profile picture URL (Cloudinary URL if uploaded)\n- `createdAt` (datetime): Profile creation timestamp\n- `updatedAt` (datetime): Profile last update timestamp\n\n**Validations:**\n- Organizer must be authenticated\n- Organizer profile must exist\n\n**Note:** \n- Returns 404 if organizer profile doesn't exist\n- Returns 403 if user is not an organizer"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"message\": \"Profile fetched successfully\",\n  \"data\": {\n    \"id\": \"organizer-profile-uuid\",\n    \"userId\": \"user-uuid\",\n    \"orgId\": \"ORG0022\",\n    \"organizationName\": \"Mumbai Billiards Club\",\n    \"contactPersonName\": \"John Doe\",\n    \"phone\": \"+1234567890\",\n    \"email\": \"contact@mumbaibilliards.com\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"country\": \"India\",\n    \"isPremium\": false,\n    \"profilePicUrl\": \"https://res.cloudinary.com/your-cloud-name/image/upload/v1234567890/billiards/organizers/profiles/user-uuid_1234567890.jpg\",\n    \"createdAt\": \"2025-11-14T10:00:00.000Z\",\n    \"updatedAt\": \"2025-11-15T12:00:00.000Z\"\n  }\n}"
+						},
+						{
+							"name": "Not Found - Profile",
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Organizer profile not found\"\n}"
+						},
+						{
+							"name": "Unauthorized - Invalid Token",
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Organizer ID not found in token\"\n}"
+						},
+						{
+							"name": "Forbidden - Not Organizer",
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"User is not an organizer\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{access_token}}" }
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "organizationName",
+									"value": "Mumbai Billiards Club",
+									"type": "text",
+									"description": "Organization name (max 100 characters)"
+								},
+								{
+									"key": "contactPersonName",
+									"value": "John Doe",
+									"type": "text",
+									"description": "Contact person name (max 100 characters)"
+								},
+								{
+									"key": "phone",
+									"value": "+1234567890",
+									"type": "text",
+									"description": "Phone number (max 15 characters)"
+								},
+								{
+									"key": "email",
+									"value": "contact@mumbaibilliards.com",
+									"type": "text",
+									"description": "Email address (max 100 characters)"
+								},
+								{
+									"key": "city",
+									"value": "Mumbai",
+									"type": "text",
+									"description": "City (max 100 characters)"
+								},
+								{
+									"key": "state",
+									"value": "Maharashtra",
+									"type": "text",
+									"description": "State (max 100 characters)"
+								},
+								{
+									"key": "country",
+									"value": "India",
+									"type": "text",
+									"description": "Country (max 100 characters)"
+								},
+								{
+									"key": "profilePicture",
+									"type": "file",
+									"src": [],
+									"description": "Profile picture file (image). Will be uploaded to Cloudinary and stored in billiards/organizers/profiles/ folder. Old profile picture will be automatically deleted."
+								},
+								{
+									"key": "profilePicUrl",
+									"value": "",
+									"type": "text",
+									"description": "Alternative: Direct profile picture URL (if not uploading file). Leave empty if using profilePicture file upload."
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/organizers/profile",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "organizers", "profile" ]
+						},
+						"description": "Update organizer profile with Cloudinary file upload support. All fields are optional - only provided fields will be updated. Requires valid organizer token.\n\n**Request Body (multipart/form-data, All Optional):**\n- `organizationName` (string, max 100): Organization name\n- `contactPersonName` (string, max 100): Contact person name\n- `phone` (string, max 15): Phone number\n- `email` (string, max 100): Email address\n- `city` (string, max 100): City\n- `state` (string, max 100): State\n- `country` (string, max 100): Country\n- `profilePicture` (file): Profile picture file upload - will be uploaded to Cloudinary in billiards/organizers/profiles/ folder\n- `profilePicUrl` (string): Alternative - Direct profile picture URL (use this if not uploading file)\n\n**Cloudinary Integration:**\n- Profile pictures are automatically uploaded to Cloudinary\n- Files are stored in: billiards/organizers/profiles/{userId}_{timestamp}.jpg\n- Old profile pictures are automatically deleted when a new one is uploaded\n- Cloudinary returns secure HTTPS URL which is stored in database\n- Requires CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables\n\n**Validations:**\n- Organizer must be authenticated\n- At least one field must be provided\n- File uploads are limited to images (validated by multer middleware)\n\n**Note:** \n- If organizer profile doesn't exist, it will be automatically created with provided fields and defaults (org_id extracted from user identifier).\n- Use either profilePicture (file upload) OR profilePicUrl (URL string), not both.\n- If profilePicture file is provided, it takes precedence over profilePicUrl."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"message\": \"Profile updated successfully\",\n  \"data\": {\n    \"id\": \"organizer-profile-uuid\",\n    \"userId\": \"user-uuid\",\n    \"orgId\": \"ORG0022\",\n    \"organizationName\": \"Mumbai Billiards Club\",\n    \"contactPersonName\": \"John Doe\",\n    \"phone\": \"+1234567890\",\n    \"email\": \"contact@mumbaibilliards.com\",\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"country\": \"India\",\n    \"isPremium\": false,\n    \"profilePicUrl\": \"https://res.cloudinary.com/your-cloud-name/image/upload/v1234567890/billiards/organizers/profiles/user-uuid_1234567890.jpg\",\n    \"createdAt\": \"2025-11-14T10:00:00.000Z\",\n    \"updatedAt\": \"2025-11-15T12:00:00.000Z\"\n  }\n}"
+						},
+						{
+							"name": "Cloudinary Upload Error",
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Failed to upload profile picture to Cloudinary. Please try again.\"\n}"
+						},
+						{
+							"name": "Cloudinary Not Configured",
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Cloudinary is not configured. Please check environment variables.\"\n}"
+						},
+						{
+							"name": "Unauthorized - Invalid Token",
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Organizer ID not found in token\"\n}"
+						},
+						{
+							"name": "Forbidden - Not Organizer",
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"User is not an organizer\"\n}"
+						}
+					]
 				}
 			],
 			"description": "Organizer-specific endpoints for managing tournaments"
@@ -2547,6 +2721,219 @@
 							],
 							"cookie": [],
 							"body": "{\n  \"success\": false,\n  \"message\": \"Unauthorized\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Profile",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{access_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/customers/profile",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "customers", "profile" ]
+						},
+						"description": "Get customer profile. Returns the current customer's profile information including all profile fields. Requires valid customer token.\n\n**Response Fields:**\n- `id` (uuid): Customer profile ID\n- `userId` (uuid): User ID\n- `firstName` (string): First name\n- `lastName` (string): Last name\n- `displayName` (string): Auto-generated display name (read-only)\n- `phone` (string, nullable): Phone number\n- `profilePic` (string, nullable): Profile picture URL (Cloudinary URL if uploaded)\n- `skillLevel` (string, nullable): Skill level - 'beginner', 'intermediate', 'advanced', or 'expert'\n- `rating` (number, nullable): Rating\n- `city` (string, nullable): City\n- `state` (string, nullable): State\n- `country` (string, nullable): Country\n- `preferredGameTypes` (string[], nullable): Array of preferred game types\n- `createdAt` (datetime): Profile creation timestamp\n- `updatedAt` (datetime): Profile last update timestamp\n\n**Validations:**\n- Customer must be authenticated\n- Customer profile must exist\n\n**Note:** \n- Returns 404 if customer profile doesn't exist\n- Returns 403 if user is not a customer"
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"message\": \"Profile fetched successfully\",\n  \"data\": {\n    \"id\": \"customer-profile-uuid\",\n    \"userId\": \"user-uuid\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"displayName\": \"John Doe\",\n    \"phone\": \"+1234567890\",\n    \"profilePic\": \"https://res.cloudinary.com/your-cloud-name/image/upload/v1234567890/billiards/customers/profiles/user-uuid_1234567890.jpg\",\n    \"skillLevel\": \"intermediate\",\n    \"rating\": 1200,\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"country\": \"India\",\n    \"preferredGameTypes\": [\"8-ball\", \"9-ball\", \"snooker\"],\n    \"createdAt\": \"2025-11-14T10:00:00.000Z\",\n    \"updatedAt\": \"2025-11-15T12:00:00.000Z\"\n  }\n}"
+						},
+						{
+							"name": "Not Found - Profile",
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Customer profile not found\"\n}"
+						},
+						{
+							"name": "Unauthorized - Invalid Token",
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Customer ID not found in token\"\n}"
+						},
+						{
+							"name": "Forbidden - Not Customer",
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"User is not a customer\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Update Profile",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{access_token}}" }
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "firstName",
+									"value": "John",
+									"type": "text",
+									"description": "First name (max 50 characters)"
+								},
+								{
+									"key": "lastName",
+									"value": "Doe",
+									"type": "text",
+									"description": "Last name (max 50 characters)"
+								},
+								{
+									"key": "phone",
+									"value": "+1234567890",
+									"type": "text",
+									"description": "Phone number (max 15 characters)"
+								},
+								{
+									"key": "profilePicture",
+									"type": "file",
+									"src": [],
+									"description": "Profile picture file (image). Will be uploaded to Cloudinary and stored in billiards/customers/profiles/ folder. Old profile picture will be automatically deleted."
+								},
+								{
+									"key": "profilePic",
+									"value": "",
+									"type": "text",
+									"description": "Alternative: Direct profile picture URL (if not uploading file). Leave empty if using profilePicture file upload."
+								},
+								{
+									"key": "skillLevel",
+									"value": "intermediate",
+									"type": "text",
+									"description": "Skill level: 'beginner', 'intermediate', 'advanced', or 'expert'"
+								},
+								{
+									"key": "rating",
+									"value": "1200",
+									"type": "text",
+									"description": "Rating (must be >= 0)"
+								},
+								{
+									"key": "city",
+									"value": "Mumbai",
+									"type": "text",
+									"description": "City (max 100 characters)"
+								},
+								{
+									"key": "state",
+									"value": "Maharashtra",
+									"type": "text",
+									"description": "State (max 100 characters)"
+								},
+								{
+									"key": "country",
+									"value": "India",
+									"type": "text",
+									"description": "Country (max 100 characters)"
+								},
+								{
+									"key": "preferredGameTypes",
+									"value": "[\"8-ball\", \"9-ball\", \"snooker\"]",
+									"type": "text",
+									"description": "Array of preferred game types as JSON string (e.g., [\"8-ball\", \"9-ball\", \"snooker\"])"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/customers/profile",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "customers", "profile" ]
+						},
+						"description": "Update customer profile with Cloudinary file upload support. All fields are optional - only provided fields will be updated. Requires valid customer token.\n\n**Request Body (multipart/form-data, All Optional):**\n- `firstName` (string, max 50): First name\n- `lastName` (string, max 50): Last name\n- `phone` (string, max 15): Phone number\n- `profilePicture` (file): Profile picture file upload - will be uploaded to Cloudinary in billiards/customers/profiles/ folder\n- `profilePic` (string, max 255): Alternative - Direct profile picture URL (use this if not uploading file)\n- `skillLevel` (string): Skill level - must be one of: 'beginner', 'intermediate', 'advanced', 'expert'\n- `rating` (number): Rating (must be >= 0)\n- `city` (string, max 100): City\n- `state` (string, max 100): State\n- `country` (string, max 100): Country\n- `preferredGameTypes` (string): JSON array string of preferred game types (e.g., '[\"8-ball\", \"9-ball\", \"snooker\"]')\n\n**Cloudinary Integration:**\n- Profile pictures are automatically uploaded to Cloudinary\n- Files are stored in: billiards/customers/profiles/{userId}_{timestamp}.jpg\n- Old profile pictures are automatically deleted when a new one is uploaded\n- Cloudinary returns secure HTTPS URL which is stored in database\n- Requires CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables\n\n**Validations:**\n- Customer must be authenticated\n- At least one field must be provided\n- skillLevel must be one of: 'beginner', 'intermediate', 'advanced', 'expert'\n- rating must be >= 0\n- File uploads are limited to images (validated by multer middleware)\n\n**Note:** \n- If customer profile doesn't exist, it will be automatically created with provided fields and defaults.\n- display_name is auto-generated from first_name and last_name (read-only).\n- Use either profilePicture (file upload) OR profilePic (URL string), not both.\n- If profilePicture file is provided, it takes precedence over profilePic URL."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"message\": \"Profile updated successfully\",\n  \"data\": {\n    \"id\": \"customer-profile-uuid\",\n    \"userId\": \"user-uuid\",\n    \"firstName\": \"John\",\n    \"lastName\": \"Doe\",\n    \"displayName\": \"John Doe\",\n    \"phone\": \"+1234567890\",\n    \"profilePic\": \"https://res.cloudinary.com/your-cloud-name/image/upload/v1234567890/billiards/customers/profiles/user-uuid_1234567890.jpg\",\n    \"skillLevel\": \"intermediate\",\n    \"rating\": 1200,\n    \"city\": \"Mumbai\",\n    \"state\": \"Maharashtra\",\n    \"country\": \"India\",\n    \"preferredGameTypes\": [\"8-ball\", \"9-ball\", \"snooker\"],\n    \"createdAt\": \"2025-11-14T10:00:00.000Z\",\n    \"updatedAt\": \"2025-11-15T12:00:00.000Z\"\n  }\n}"
+						},
+						{
+							"name": "Bad Request - No Fields Provided",
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"At least one field must be provided for update\"\n}"
+						},
+						{
+							"name": "Bad Request - Invalid Skill Level",
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Invalid skill level. Must be one of: beginner, intermediate, advanced, expert\"\n}"
+						},
+						{
+							"name": "Bad Request - Invalid Rating",
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Rating must be greater than or equal to 0\"\n}"
+						},
+						{
+							"name": "Unauthorized - Invalid Token",
+							"status": "Unauthorized",
+							"code": 401,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Customer ID not found in token\"\n}"
+						},
+						{
+							"name": "Forbidden - Not Customer",
+							"status": "Forbidden",
+							"code": 403,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"User is not a customer\"\n}"
+						},
+						{
+							"name": "Internal Server Error - Cloudinary Not Configured",
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Cloudinary is not configured. Please check environment variables.\"\n}"
+						},
+						{
+							"name": "Internal Server Error - Cloudinary Upload Failed",
+							"status": "Internal Server Error",
+							"code": 500,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Failed to upload profile picture to Cloudinary. Please try again.\"\n}"
 						}
 					]
 				},

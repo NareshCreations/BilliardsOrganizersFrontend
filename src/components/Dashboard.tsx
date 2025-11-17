@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { OrganizerHeader } from './organisms/OrganizerHeader/OrganizerHeader';
 import DashboardHeader from './Header/DashboardHeader';
@@ -26,6 +27,7 @@ export interface DashboardProps {
  * Main dashboard for billiards tournament organizers
  */
 const OrganizerDashboard: React.FC<DashboardProps> = (props) => {
+  const navigate = useNavigate();
   const { logout } = useAuth();
 
   const [activeSection, setActiveSection] = useState<'dashboard' | 'tournaments' | 'players' | 'live-games'>('dashboard');
@@ -223,7 +225,10 @@ const OrganizerDashboard: React.FC<DashboardProps> = (props) => {
           activeSection={activeSection}
         />
       ) : (
-        <OrganizerHeader onLogout={handleLogout} />
+        <OrganizerHeader onLogout={handleLogout} onProfileClick={() => {
+          console.log('🔵 Dashboard: Profile click handler called, navigating to /organizer-profile');
+          navigate('/organizer-profile');
+        }} />
       )}
 
       <div className={styles.mainLayout}>

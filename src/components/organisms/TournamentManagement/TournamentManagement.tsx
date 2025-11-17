@@ -2,6 +2,7 @@ import React from 'react';
 import { BaseComponentComplete } from '../../base/BaseComponent';
 import { matchesApiService, Tournament, TournamentResponse } from '../../../services/matchesApi';
 import authService from '../../../services/authService';
+import styles from './TournamentManagement.module.scss';
 
 export interface TournamentManagementProps {}
 
@@ -114,14 +115,24 @@ export class TournamentManagement extends BaseComponentComplete<TournamentManage
     }));
   };
 
-  private getStatusColor = (status: string): string => {
-    switch (status) {
-      case 'ongoing': return '#10b981';
-      case 'upcoming': return '#f59e0b';
-      case 'completed': return '#6b7280';
-      case 'cancelled': return '#ef4444';
-      case 'draft': return '#6b7280';
-      default: return '#6b7280';
+  private getStatusClass = (status: string): string => {
+    const statusLower = status.toLowerCase();
+    switch (statusLower) {
+      case 'ongoing':
+      case 'started':
+        return styles.statusStarted;
+      case 'upcoming':
+        return styles.statusUpcoming;
+      case 'completed':
+        return styles.statusCompleted;
+      case 'cancelled':
+        return styles.statusCancelled;
+      case 'draft':
+        return styles.statusDraft;
+      case 'registration_open':
+        return styles.statusRegistrationOpen;
+      default:
+        return styles.statusDraft;
     }
   };
 
@@ -129,134 +140,74 @@ export class TournamentManagement extends BaseComponentComplete<TournamentManage
     const { tournaments, showCreateForm, newTournament, loading, error } = this.state;
 
     return (
-      <div style={{ padding: '2rem', color: '#ffffff' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <h2 style={{ margin: 0, color: '#ffffff' }}>Tournament Management</h2>
+      <div className={styles.tournamentManagement}>
+        <div className={styles.header}>
+          <h2 className={styles.title}>Tournament Management</h2>
           <button
             onClick={this.handleCreateTournament}
             disabled={loading}
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: loading ? '#6b7280' : '#3b82f6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.5rem',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              fontSize: '0.875rem',
-              fontWeight: '500'
-            }}
+            className={styles.createButton}
           >
             Create Tournament
           </button>
         </div>
 
         {error && (
-          <div style={{
-            backgroundColor: '#ef4444',
-            color: 'white',
-            padding: '1rem',
-            borderRadius: '0.5rem',
-            marginBottom: '2rem'
-          }}>
+          <div className={styles.errorMessage}>
             Error: {error}
           </div>
         )}
 
         {loading && (
-          <div style={{
-            textAlign: 'center',
-            padding: '2rem',
-            color: '#9ca3af'
-          }}>
+          <div className={styles.loadingState}>
             Loading tournaments...
           </div>
         )}
 
         {showCreateForm && (
-          <div style={{
-            backgroundColor: '#1f2937',
-            padding: '1.5rem',
-            borderRadius: '0.5rem',
-            marginBottom: '2rem',
-            border: '1px solid #374151'
-          }}>
-            <h3 style={{ marginTop: 0, marginBottom: '1rem', color: '#ffffff' }}>Create New Tournament</h3>
-            <div style={{ display: 'grid', gap: '1rem', maxWidth: '400px' }}>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.25rem', color: '#d1d5db' }}>Tournament Name</label>
+          <div className={styles.createForm}>
+            <h3 className={styles.formTitle}>Create New Tournament</h3>
+            <div className={styles.formGrid}>
+              <div className={styles.formField}>
+                <label className={styles.formLabel}>Tournament Name</label>
                 <input
                   type="text"
                   value={newTournament.name}
                   onChange={(e) => this.handleInputChange('name', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    backgroundColor: '#374151',
-                    border: '1px solid #4b5563',
-                    borderRadius: '0.25rem',
-                    color: '#ffffff'
-                  }}
+                  className={styles.formInput}
                   placeholder="Enter tournament name"
                 />
               </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.25rem', color: '#d1d5db' }}>Start Date</label>
+              <div className={styles.formField}>
+                <label className={styles.formLabel}>Start Date</label>
                 <input
                   type="date"
                   value={newTournament.startDate}
                   onChange={(e) => this.handleInputChange('startDate', e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    backgroundColor: '#374151',
-                    border: '1px solid #4b5563',
-                    borderRadius: '0.25rem',
-                    color: '#ffffff'
-                  }}
+                  className={styles.formInput}
                 />
               </div>
-              <div>
-                <label style={{ display: 'block', marginBottom: '0.25rem', color: '#d1d5db' }}>Max Players</label>
+              <div className={styles.formField}>
+                <label className={styles.formLabel}>Max Players</label>
                 <input
                   type="number"
                   value={newTournament.maxPlayers}
                   onChange={(e) => this.handleInputChange('maxPlayers', parseInt(e.target.value) || 32)}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    backgroundColor: '#374151',
-                    border: '1px solid #4b5563',
-                    borderRadius: '0.25rem',
-                    color: '#ffffff'
-                  }}
+                  className={styles.formInput}
                   min="4"
                   max="128"
                 />
               </div>
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+              <div className={styles.formActions}>
                 <button
                   onClick={this.handleSaveTournament}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    backgroundColor: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.25rem',
-                    cursor: 'pointer'
-                  }}
+                  className={styles.saveButton}
                 >
                   Save
                 </button>
                 <button
                   onClick={this.handleCancelCreate}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    backgroundColor: '#6b7280',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '0.25rem',
-                    cursor: 'pointer'
-                  }}
+                  className={styles.cancelButton}
                 >
                   Cancel
                 </button>
@@ -265,49 +216,24 @@ export class TournamentManagement extends BaseComponentComplete<TournamentManage
           </div>
         )}
 
-        <div style={{ display: 'grid', gap: '1rem' }}>
+        <div className={styles.tournamentsList}>
           {tournaments.map((tournament) => (
             <div
               key={tournament.id}
-              style={{
-                backgroundColor: '#1f2937',
-                padding: '1.5rem',
-                borderRadius: '0.5rem',
-                border: '1px solid #374151'
-              }}
+              className={styles.tournamentCard}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div>
-                  <h3 style={{ margin: 0, color: '#ffffff' }}>{tournament.name}</h3>
-                  <p style={{ margin: '0.25rem 0', color: '#9ca3af' }}>
+              <div className={styles.cardContent}>
+                <div className={styles.cardInfo}>
+                  <h3 className={styles.cardTitle}>{tournament.name}</h3>
+                  <p className={styles.cardDetails}>
                     {tournament.startDate ? new Date(tournament.startDate).toLocaleDateString() : 'Date TBD'} • {tournament.currentParticipants}/{tournament.maxParticipants} players • ₹{tournament.entryFee}
                   </p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <span
-                    style={{
-                      padding: '0.25rem 0.75rem',
-                      backgroundColor: this.getStatusColor(tournament.status),
-                      color: 'white',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      fontWeight: '500',
-                      textTransform: 'uppercase'
-                    }}
-                  >
+                <div className={styles.cardActions}>
+                  <span className={`${styles.statusBadge} ${this.getStatusClass(tournament.status)}`}>
                     {tournament.status}
                   </span>
-                  <button
-                    style={{
-                      padding: '0.5rem 1rem',
-                      backgroundColor: '#3b82f6',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '0.25rem',
-                      cursor: 'pointer',
-                      fontSize: '0.875rem'
-                    }}
-                  >
+                  <button className={styles.manageButton}>
                     Manage
                   </button>
                 </div>
@@ -317,7 +243,7 @@ export class TournamentManagement extends BaseComponentComplete<TournamentManage
         </div>
 
         {!loading && tournaments.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '3rem', color: '#9ca3af' }}>
+          <div className={styles.emptyState}>
             <p>No tournaments found. Create your first tournament to get started.</p>
           </div>
         )}
