@@ -114,8 +114,19 @@ export interface TournamentResponse {
 
 class MatchesApiService {
   private baseUrl = '/api/matches';
-  // Default to port 3005 as per Postman collection, but allow override via env variable
-  private apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3005/api/v1';
+  // Determine API base URL
+  // Use relative path to leverage proxy (Vite in dev, server.js in production)
+  // Only use full URL if explicitly set via environment variable
+  private getApiBaseUrl(): string {
+    const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+    if (envUrl) {
+      return envUrl;
+    }
+    // Use relative path - will be proxied by Vite (dev) or server.js (production)
+    return '/api/v1';
+  }
+  
+  private apiBaseUrl = this.getApiBaseUrl();
 
   // Simulate API delay
   private delay(ms: number = 500): Promise<void> {

@@ -1,8 +1,19 @@
 // API Configuration
 import authService from './authService';
 
-// Default to port 3005 as per Postman collection, but allow override via env variable
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3005/api/v1';
+// Determine API base URL
+// Use relative path to leverage proxy (Vite in dev, server.js in production)
+// Only use full URL if explicitly set via environment variable
+const getApiBaseUrl = (): string => {
+  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+  // Use relative path - will be proxied by Vite (dev) or server.js (production)
+  return '/api/v1';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Helper function to make authenticated API calls
 export const makeAuthenticatedRequest = async (
