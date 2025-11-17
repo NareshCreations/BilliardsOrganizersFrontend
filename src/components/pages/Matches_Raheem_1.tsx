@@ -1,16 +1,9 @@
 ﻿import React from 'react';
 import { BaseComponentComplete } from '../base/BaseComponent';
-import { Calendar, Clock, Users, Settings, Trophy, Plus, Save, X, Check, AlertCircle, MapPin, User, Target, ChevronRight, Bell, Trash2 } from 'lucide-react';
+import { Calendar, Clock, Users, Settings, Trophy, Plus, Save, X, Check, AlertCircle, MapPin, User, Target, ChevronRight, Bell } from 'lucide-react';
 import { matchesApiService, Match as ApiMatch } from '../../services/matchesApi';
 import authService from '../../services/authService';
 
-// Global fallback avatar for empty/missing profile pictures (gravatar default)
-const DEFAULT_AVATAR = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y&s=400';
-const getAvatar = (url?: string | null): string => {
-  if (!url) return DEFAULT_AVATAR;
-  const trimmed = typeof url === 'string' ? url.trim() : '';
-  return trimmed.length > 0 ? trimmed : DEFAULT_AVATAR;
-};
 export interface MatchesProps {
   className?: string;
 }
@@ -35,11 +28,6 @@ interface MatchForm {
   notificationMessage?: string;
   notificationRecipients?: string;
   selectedSkillCustomers?: number[];
-  // New API fields
-  tournamentDate?: string;
-  tournamentTime?: string;
-  prizePool?: string;
-  registrationDeadline?: string;
 }
 
 interface Location {
@@ -61,7 +49,6 @@ interface TournamentDashboard extends Match {
 interface Player {
   id: string;
   name: string;
-  displayName?: string; // Customer display name from API
   email: string;
   skill: string;
   profilePic: string;
@@ -77,17 +64,12 @@ interface Player {
   lastRoundPlayedNumber?: number; // Track the round number (array index) where they last played
   roundsWon?: string[];
   hasPlayed?: boolean;
-  customerProfileId?: string | null; // Customer profile ID for API calls
 }
 
 interface TournamentRound {
   id: string;
   name: string;
   displayName?: string;
-  apiRoundId?: string; // API round UUID from backend
-  roundNumber?: number; // Round number in the tournament
-  totalMatches?: number; // Total number of matches in this round
-  completedMatches?: number; // Number of completed matches in this round
   players: Player[];
   matches: TournamentMatch[];
   winners: Player[];
@@ -98,7 +80,6 @@ interface TournamentRound {
 
 interface TournamentMatch {
   id: string;
-  apiMatchId?: string; // API match UUID from backend
   player1: Player;
   player2: Player;
   status: 'pending' | 'active' | 'completed';
@@ -294,14 +275,6 @@ export class Matches extends BaseComponentComplete<MatchesProps, MatchesState> {
     this.log('Matches component initialized');
   }
 
-  /**
-   * Helper function to get display name for a player
-   * Uses displayName if available, otherwise falls back to name
-   */
-  private getPlayerDisplayName(player: Player): string {
-    return player.displayName || player.name || 'Unknown Player';
-  }
-
   protected getInitialState(): MatchesState {
     return {
       activeTab: 'schedule',
@@ -331,12 +304,7 @@ export class Matches extends BaseComponentComplete<MatchesProps, MatchesState> {
         notificationTitle: '',
         notificationMessage: '',
         notificationRecipients: 'all',
-        selectedSkillCustomers: [],
-        // New API fields
-        tournamentDate: '',
-        tournamentTime: '',
-        prizePool: '',
-        registrationDeadline: ''
+        selectedSkillCustomers: []
       },
       selectedLocation: null,
       notificationForm: {
@@ -402,34 +370,6 @@ selectedRoundDisplayName: '',
 
   componentDidMount() {
     this.loadData();
-  }
-
-  /**
-   * Helper method to check if an error indicates session expiration
-   * Returns true if the error is a session expired error (should redirect to login)
-   */
-  private isSessionExpiredError(error: any): boolean {
-    const errorMessage = error instanceof Error ? error.message : String(error || '');
-    return errorMessage.includes('Session expired') || 
-           errorMessage.includes('Unauthorized') || 
-           errorMessage.includes('401') ||
-           errorMessage.includes('Invalid or expired token') ||
-           errorMessage.includes('token expired') ||
-           errorMessage.includes('expired token');
-  }
-
-  /**
-   * Helper method to handle errors - redirects to login if session expired, otherwise shows alert
-   */
-  private handleError(error: any, defaultMessage: string, alertTitle: string = 'Error'): void {
-    if (this.isSessionExpiredError(error)) {
-      console.log('🔐 Session expired, redirecting to login...');
-      // Don't show alert, redirect is already handled by API or will be handled by authService
-      return;
-    }
-    
-    const errorMessage = error instanceof Error ? error.message : defaultMessage;
-    this.showCustomAlert(alertTitle, errorMessage);
   }
 
   private async loadData() {
@@ -704,38 +644,10 @@ selectedRoundDisplayName: '',
     }
   };
 
-  private handleSubmit = async (): Promise<void> => {
+  private handleSubmit = (): void => {
     const { matchForm } = this.state;
     
-    // Validate required fields
-    if (!matchForm.matchName || !matchForm.gameType || !matchForm.tournamentDate || 
-        !matchForm.tournamentTime || !matchForm.maxPlayers || !matchForm.entryFee || 
-        !matchForm.prizePool) {
-      this.showCustomAlert('Validation Error', 'Please fill in all required fields marked with *.');
-      return;
-    }
-
-    // Prepare API payload
-    const tournamentData = {
-      tournamentName: matchForm.matchName,
-      gameType: matchForm.gameType,
-      tournamentDate: matchForm.tournamentDate,
-      tournamentTime: matchForm.tournamentTime,
-      maxPlayers: parseInt(matchForm.maxPlayers, 10),
-      entryFee: parseFloat(matchForm.entryFee),
-      prizePool: parseFloat(matchForm.prizePool || '0'),
-      description: matchForm.moreDetails || matchForm.fewRules || undefined,
-      registrationDeadline: matchForm.registrationDeadline || undefined
-    };
-
-    this.setState({ loading: true });
-
-    try {
-      console.log('🏆 Creating tournament with data:', tournamentData);
-      const response = await matchesApiService.createTournament(tournamentData);
-      
-      if (response.success) {
-        console.log('✅ Tournament created successfully:', response.data);
+    console.log('Match scheduled:', matchForm);
     
     // Handle notification if enabled
     if (matchForm.sendNotification && matchForm.notificationTitle && matchForm.notificationMessage) {
@@ -761,19 +673,17 @@ selectedRoundDisplayName: '',
       });
       
       if (recipientCount > 0) {
-            this.showCustomAlert('Success', `Tournament created successfully! Notification sent to ${recipientCount} customers.`);
+        alert(`Tournament created successfully! Notification sent to ${recipientCount} customers.`);
       } else {
-            this.showCustomAlert('Success', 'Tournament created successfully! No customers selected for notification.');
+        alert('Tournament created successfully! No customers selected for notification.');
       }
     } else {
-          this.showCustomAlert('Success', 'Tournament created successfully!');
+      alert('Tournament created successfully!');
     }
     
-        // Reset form
     this.setState({
       isCreatingMatch: false,
       isEditMode: false,
-          loading: false,
       matchForm: {
         matchName: '',
         gameType: '9-ball',
@@ -793,33 +703,10 @@ selectedRoundDisplayName: '',
         notificationTitle: '',
         notificationMessage: '',
         notificationRecipients: 'all',
-        selectedSkillCustomers: [],
-        // New API fields
-        tournamentDate: '',
-        tournamentTime: '',
-        prizePool: '',
-        registrationDeadline: ''
+        selectedSkillCustomers: []
       },
       selectedLocation: null
     });
-
-        // Refresh tournaments list if loadTournaments exists
-        if (typeof (this as any).loadTournaments === 'function') {
-          (this as any).loadTournaments();
-        }
-      } else {
-        throw new Error(response.message || 'Failed to create tournament');
-      }
-    } catch (error) {
-      console.error('❌ Error creating tournament:', error);
-      this.setState({ loading: false });
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        return;
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create tournament';
-      this.showCustomAlert('Error', `Failed to create tournament: ${errorMessage}`);
-    }
   };
 
   private getNotificationRecipients = (recipientType: string): any[] => {
@@ -1121,18 +1008,9 @@ selectedRoundDisplayName: '',
     return round.matches.every(match => match.status === 'completed');
   };
 
-  private handleMoveSelectedToRound = async (): Promise<void> => {
-    console.log('🎯 handleMoveSelectedToRound called');
-    
+  private handleMoveSelectedToRound = (): void => {
     if (!this.state.currentGameMatch || !this.state.selectedRoundId) {
-      console.log('❌ Missing currentGameMatch or selectedRoundId');
-      this.showCustomAlert('Error', 'Please select a target round');
-      return;
-    }
-    
-    if (!this.state.currentGameMatch.allPlayers) {
-      console.log('❌ No players available');
-      this.showCustomAlert('Error', 'No players available');
+      alert('Please select a target round');
       return;
     }
   
@@ -1140,19 +1018,15 @@ selectedRoundDisplayName: '',
       .filter((player: Player) => player.selected);
   
     if (selectedPlayers.length === 0) {
-      console.log('❌ No players selected');
-      this.showCustomAlert('Error', 'Please select players to move');
+      alert('Please select players to move');
       return;
     }
-  
-    console.log(`✅ Found ${selectedPlayers.length} selected player(s):`, selectedPlayers.map(p => ({ name: p.name, id: p.id, customerProfileId: p.customerProfileId })));
   
     // Find the target round
     const targetRoundIndex = this.state.rounds.findIndex(r => r.id === this.state.selectedRoundId);
     
     if (targetRoundIndex === -1) {
-      console.log('❌ Target round not found');
-      this.showCustomAlert('Error', 'Target round not found');
+      alert('Target round not found');
       return;
     }
   
@@ -1167,54 +1041,12 @@ selectedRoundDisplayName: '',
       return;
     }
     
-    // Get tournament ID and round ID for API call
-    const tournamentId = this.state.currentGameMatch.tournamentId;
-    if (!tournamentId) {
-      console.log('❌ Tournament ID not found');
-      this.showCustomAlert('Error', 'Tournament ID not found. Please refresh and try again.');
-      return;
-    }
-    
-    // Use API round ID if available, otherwise use local ID (fallback)
-    const roundId = targetRound.apiRoundId || targetRound.id;
-    
-    console.log('🎯 API Parameters:', { tournamentId, roundId, selectedPlayersCount: selectedPlayers.length });
-    
-    // Get customerProfileId from selected players
-    const playerIds = selectedPlayers
-      .map(p => p.customerProfileId)
-      .filter((id): id is string => id !== null && id !== undefined);
-    
-    console.log('🎯 Player IDs extracted:', playerIds);
-    console.log('🎯 Selected players with customerProfileId:', selectedPlayers.map(p => ({ name: p.name, customerProfileId: p.customerProfileId })));
-    
-    if (playerIds.length === 0) {
-      console.error('❌ No valid player IDs found. Selected players:', selectedPlayers.map(p => ({ name: p.name, id: p.id, customerProfileId: p.customerProfileId })));
-      this.showCustomAlert(
-        'Error',
-        `No valid player IDs found. Please ensure players have customer profile IDs.\n\nSelected players: ${selectedPlayers.map(p => p.name).join(', ')}`
-      );
-      return;
-    }
-    
     const currentPlayersInTarget = targetRound.players.length;
     const playersAfterMove = currentPlayersInTarget + selectedPlayers.length;
   
     // Allow single players to be moved to rounds - they can wait as unmatched players
     // The validation for even numbers will happen when creating matches, not when moving players
-    console.log(`🎯 Moving ${selectedPlayers.length} player(s) from Main Area to ${targetRound.displayName || targetRound.name}. Target will have ${playersAfterMove} players.`);
-    
-    // Show loading state
-    this.setState({ loading: true });
-  
-    try {
-      // Call the API to move players
-      console.log('🎯 Calling movePlayersToRound API with:', { tournamentId, roundId, playerIds });
-      const response = await matchesApiService.movePlayersToRound(tournamentId, roundId, playerIds);
-      console.log('🎯 API Response:', response);
-      
-      if (response.success) {
-        console.log('✅ Players moved to round via API:', response.data);
+    console.log(`Moving ${selectedPlayers.length} player(s) from Main Area to ${targetRound.displayName || targetRound.name}. Target will have ${playersAfterMove} players.`);
   
     // Update the rounds array - add players to target round
     const updatedRounds = this.state.rounds.map((round, index) => {
@@ -1259,30 +1091,11 @@ selectedRoundDisplayName: '',
       },
       rounds: updatedRounds,
       selectedRoundId: 'dashboard', // Reset selection after successful move
-          activeRoundTab: targetRoundId, // Set the active round tab to show the target round
-          loading: false
+      activeRoundTab: targetRoundId // Set the active round tab to show the target round
     });
   
     const targetRoundName = this.state.rounds[targetRoundIndex].displayName || this.state.rounds[targetRoundIndex].name;
     console.log(`✅ Moved ${selectedPlayers.length} players to "${targetRoundName}"`);
-        
-        // Show success message
-        this.showCustomAlert(
-          'Players Moved Successfully',
-          `Successfully moved ${response.data.moved || selectedPlayers.length} player(s) to "${targetRoundName}".${response.data.skipped > 0 ? `\n\nNote: ${response.data.skipped} player(s) were skipped (already in round).` : ''}`
-        );
-      } else {
-        throw new Error(response.message || 'Failed to move players');
-      }
-    } catch (error) {
-      console.error('❌ Error moving players to round:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to move players to round';
-      this.setState({ loading: false });
-      this.showCustomAlert(
-        'Error Moving Players',
-        `Failed to move players: ${errorMessage}\n\nPlease try again.`
-      );
-    }
   };
 
 
@@ -1405,8 +1218,6 @@ selectedRoundDisplayName: '',
       // Fetch registered players
       const playersResponse = await matchesApiService.getTournamentPlayers(tournamentId);
       
-      console.log("playersResponse", playersResponse);
-      console.log("playersResponse.data.tournament_status.rounds", playersResponse.data.tournament_status.rounds);
       console.log('👥 API call completed, response received');
       console.log('👥 Response success:', playersResponse.success);
       console.log('👥 Response message:', playersResponse.message);
@@ -1476,1204 +1287,111 @@ selectedRoundDisplayName: '',
       if (shouldGoToDashboard) {
         // Go directly to tournament dashboard
         console.log('🎮 Status is started/running/completed - going directly to dashboard');
-        
+
+        // Extract tournament data from API response
+        const apiTournament = playersResponse.data?.tournament_status?.tournament;
+        const apiRounds = playersResponse.data?.tournament_status?.rounds || [];
+
         // Convert tournamentId string to number for Match interface compatibility
         const tournamentIdNumber = tournamentId.split('').reduce((acc: number, char: string) => acc + char.charCodeAt(0), 0);
-       
-        // Removed static fallback data - using only API response
-        /*
-        const staticRoundsa: TournamentRound[] = [
-          {
-            id: 'round_final',
-            name: 'Round 1',
-            displayName: 'Championship Round',
-            status: 'completed',
-            isFrozen: true,
-            players: [
-              {
-                id: 'p1',
-                name: 'Arjun Mehta',
-                email: 'arjun.mehta@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=8',
-                selected: false,
-                status: 'winner',
-                currentRound: 'round_final',
-                currentMatch: 'match_final',
-                currentMatch: 'match_final',
-                matchesPlayed: 1,
-                roundsWon: ['round_final'],
-                hasPlayed: true
-              },
-              {
-                id: 'p2',
-                name: 'Rohan Mehta',
-                email: 'rohan.mehta@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=19',
-                selected: false,
-                status: 'eliminated',
-                currentRound: 'round_final',
-                currentMatch: 'match_final',
-                matchesPlayed: 1,
-                roundsWon: [],
-                hasPlayed: true
-              },
-              {
-                id: 'p3',
-                name: 'Tanya Saxena',
-                email: 'tanya.saxena@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=4',
-                selected: false,
-                status: 'winner',
-                currentRound: 'round_final',
-                currentMatch: 'match_bronze',
-                matchesPlayed: 1,
-                roundsWon: ['round_final'],
-                hasPlayed: true
-              },
-              {
-                id: 'p4',
-                name: 'Vikram Singh',
-                email: 'vikram.singh@example.com',
-                skill: 'Intermediate',
-                profilePic: 'https://i.pravatar.cc/150?img=18',
-                selected: false,
-                status: 'eliminated',
-                currentRound: 'round_final',
-                currentMatch: 'match_bronze',
-                matchesPlayed: 1,
-                roundsWon: [],
-                hasPlayed: true
-              }
-            ],
-            matches: [
-              {
-                id: 'match_final',
-                player1: {
-                  id: 'p1',
-                  name: 'Arjun Mehta',
-                  email: 'arjun.mehta@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=8',
-                  selected: false,
-                  status: 'winner',
-                  currentRound: 'round_final',
-                  currentMatch: 'match_final',
-                  matchesPlayed: 1,
-                  roundsWon: ['round_final'],
-                  hasPlayed: true
-                },
-                player2: {
-                  id: 'p2',
-                  name: 'Rohan Mehta',
-                  email: 'rohan.mehta@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=19',
-                  selected: false,
-                  status: 'eliminated',
-                  currentRound: 'round_final',
-                  currentMatch: 'match_final',
-                  matchesPlayed: 1,
-                  roundsWon: [],
-                  hasPlayed: true
-                },
-                status: 'completed',
-                startTime: '2025-11-15T15:00:00.000Z',
-                endTime: '2025-11-15T15:40:00.000Z',
-                duration: '40m',
-                score: '5-3',
-                winner: {
-                  id: 'p1',
-                  name: 'Arjun Mehta',
-                  email: 'arjun.mehta@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=8',
-                  selected: false,
-                  status: 'winner',
-                  currentRound: 'round_final',
-                  currentMatch: 'match_final',
-                  matchesPlayed: 1,
-                  roundsWon: ['round_final'],
-                  hasPlayed: true
-                }
-              },
-              {
-                id: 'match_bronze',
-                player1: {
-                  id: 'p3',
-                  name: 'Tanya Saxena',
-                  email: 'tanya.saxena@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=4',
-                  selected: false,
-                  status: 'winner',
-                  currentRound: 'round_final',
-                  currentMatch: 'match_bronze',
-                  matchesPlayed: 1,
-                  roundsWon: ['round_final'],
-                  hasPlayed: true
-                },
-                player2: {
-                  id: 'p4',
-                  name: 'Vikram Singh',
-                  email: 'vikram.singh@example.com',
-                  skill: 'Intermediate',
-                  profilePic: 'https://i.pravatar.cc/150?img=18',
-                  selected: false,
-                  status: 'eliminated',
-                  currentRound: 'round_final',
-                  currentMatch: 'match_bronze',
-                  matchesPlayed: 1,
-                  roundsWon: [],
-                  hasPlayed: true
-                },
-                status: 'completed',
-                startTime: '2025-11-15T14:00:00.000Z',
-                endTime: '2025-11-15T14:35:00.000Z',
-                duration: '35m',
-                score: '4-2',
-                winner: {
-                  id: 'p3',
-                  name: 'Tanya Saxena',
-                  email: 'tanya.saxena@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=4',
-                  selected: false,
-                  status: 'winner',
-                  currentRound: 'round_final',
-                  currentMatch: 'match_bronze',
-                  matchesPlayed: 1,
-                  roundsWon: ['round_final'],
-                  hasPlayed: true
-                }
-              }
-            ],
-            winners: [
-              {
-                id: 'p1',
-                name: 'Arjun Mehta',
-                email: 'arjun.mehta@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=8',
-                selected: false,
-                status: 'winner',
-                currentRound: 'round_final',
-                currentMatch: null,
-                matchesPlayed: 1,
-                roundsWon: ['round_final'],
-                hasPlayed: true
-              },
-              {
-                id: 'p3',
-                name: 'Tanya Saxena',
-                email: 'tanya.saxena@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=4',
-                selected: false,
-                status: 'winner',
-                currentRound: 'round_final',
-                currentMatch: null,
-                matchesPlayed: 1,
-                roundsWon: ['round_final'],
-                hasPlayed: true
-              }
-            ],
-            losers: [
-              {
-                id: 'p2',
-                name: 'Rohan Mehta',
-                email: 'rohan.mehta@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=19',
-                selected: false,
-                status: 'eliminated',
-                currentRound: 'round_final',
-                currentMatch: null,
-                matchesPlayed: 1,
-                roundsWon: [],
-                hasPlayed: true
-              },
-              {
-                id: 'p4',
-                name: 'Vikram Singh',
-                email: 'vikram.singh@example.com',
-                skill: 'Intermediate',
-                profilePic: 'https://i.pravatar.cc/150?img=18',
-                selected: false,
-                status: 'eliminated',
-                currentRound: 'round_final',
-                currentMatch: null,
-                matchesPlayed: 1,
-                roundsWon: [],
-                hasPlayed: true
-              }
-            ]
-          }
-        ];
-        */
-        // Removed static fallback data - using only API response
-        /*
-        const staticRounds: TournamentRound[] = [
-          {
-            id: 'round_1',
-            name: 'Round 1',
-            displayName: 'Firstttt Round',
-            roundNumber: 1,
-            totalMatches: 2,
-            completedMatches: 2,
-            status: 'completed',
-            isFrozen: true,
-            players: [
-              {
-                id: 'p1',
-                name: 'Arjun Mehta',
-                email: 'arjun.mehta@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=8',
-                selected: false,
-                status: 'winner',
-                currentRound: 'round_1',
-                currentMatch: 'round_1-match-1',
-                matchesPlayed: 1,
-                roundsWon: ['round_1'],
-                hasPlayed: true
-              },
-              {
-                id: 'p2',
-                name: 'Rohan Mehta',
-                email: 'rohan.mehta@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=19',
-                selected: false,
-                status: 'eliminated',
-                currentRound: 'round_1',
-                currentMatch: 'round_1-match-1',
-                matchesPlayed: 1,
-                roundsWon: [],
-                hasPlayed: true
-              },
-              {
-                id: 'p3',
-                name: 'Tanya Saxena',
-                email: 'tanya.saxena@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=4',
-                selected: false,
-                status: 'winner',
-                currentRound: 'round_1',
-                currentMatch: 'round_1-match-2',
-                matchesPlayed: 1,
-                roundsWon: ['round_1'],
-                hasPlayed: true
-              },
-              {
-                id: 'p4',
-                name: 'Vikram Singh',
-                email: 'vikram.singh@example.com',
-                skill: 'Intermediate',
-                profilePic: 'https://i.pravatar.cc/150?img=18',
-                selected: false,
-                status: 'eliminated',
-                currentRound: 'round_1',
-                currentMatch: 'round_1-match-2',
-                matchesPlayed: 1,
-                roundsWon: [],
-                hasPlayed: true
-              }
-            ],
-            matches: [
-              {
-                id: 'round_1-match-1',
-                player1: {
-                  id: 'p1',
-                  name: 'Arjun Mehta',
-                  email: 'arjun.mehta@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=8',
-                  selected: false,
-                  status: 'winner',
-                  currentRound: 'round_1',
-                  currentMatch: 'round_1-match-1',
-                  matchesPlayed: 1,
-                  roundsWon: ['round_1'],
-                  hasPlayed: true
-                },
-                player2: {
-                  id: 'p2',
-                  name: 'Rohan Mehta',
-                  email: 'rohan.mehta@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=19',
-                  selected: false,
-                  status: 'eliminated',
-                  currentRound: 'round_1',
-                  currentMatch: 'round_1-match-1',
-                  matchesPlayed: 1,
-                  roundsWon: [],
-                  hasPlayed: true
-                },
-                status: 'completed',
-                startTime: '2025-11-15T14:00:00.000Z',
-                endTime: '2025-11-15T14:35:00.000Z',
-                duration: '35m',
-                score: '5-3',
-                winner: {
-                  id: 'p1',
-                  name: 'Arjun Mehta',
-                  email: 'arjun.mehta@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=8',
-                  selected: false,
-                  status: 'winner',
-                  currentRound: 'round_1',
-                  currentMatch: 'round_1-match-1',
-                  matchesPlayed: 1,
-                  roundsWon: ['round_1'],
-                  hasPlayed: true
-                }
-              },
-              {
-                id: 'round_1-match-2',
-                player1: {
-                  id: 'p3',
-                  name: 'Tanya Saxena',
-                  email: 'tanya.saxena@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=4',
-                  selected: false,
-                  status: 'winner',
-                  currentRound: 'round_1',
-                  currentMatch: 'round_1-match-2',
-                  matchesPlayed: 1,
-                  roundsWon: ['round_1'],
-                  hasPlayed: true
-                },
-                player2: {
-                  id: 'p4',
-                  name: 'Vikram Singh',
-                  email: 'vikram.singh@example.com',
-                  skill: 'Intermediate',
-                  profilePic: 'https://i.pravatar.cc/150?img=18',
-                  selected: false,
-                  status: 'eliminated',
-                  currentRound: 'round_1',
-                  currentMatch: 'round_1-match-2',
-                  matchesPlayed: 1,
-                  roundsWon: [],
-                  hasPlayed: true
-                },
-                status: 'completed',
-                startTime: '2025-11-15T14:40:00.000Z',
-                endTime: '2025-11-15T15:15:00.000Z',
-                duration: '35m',
-                score: '4-2',
-                winner: {
-                  id: 'p3',
-                  name: 'Tanya Saxena',
-                  email: 'tanya.saxena@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=4',
-                  selected: false,
-                  status: 'winner',
-                  currentRound: 'round_1',
-                  currentMatch: 'round_1-match-2',
-                  matchesPlayed: 1,
-                  roundsWon: ['round_1'],
-                  hasPlayed: true
-                }
-              }
-            ],
-            winners: [
-              {
-                id: 'p1',
-                name: 'Arjun Mehta',
-                email: 'arjun.mehta@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=8',
-                selected: false,
-                status: 'winner',
-                currentRound: 'round_1',
-                currentMatch: null,
-                matchesPlayed: 1,
-                roundsWon: ['round_1'],
-                hasPlayed: true,
-                title: 'Champion' // Winner title
-              },
-              {
-                id: 'p3',
-                name: 'Tanya Saxena',
-                email: 'tanya.saxena@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=4',
-                selected: false,
-                status: 'winner',
-                currentRound: 'round_1',
-                currentMatch: null,
-                matchesPlayed: 1,
-                roundsWon: ['round_1'],
-                hasPlayed: true,
-                title: 'Runner Up' // Winner title
-              }
-            ],
-            losers: [
-              {
-                id: 'p2',
-                name: 'Rohan Mehta',
-                email: 'rohan.mehta@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=19',
-                selected: false,
-                status: 'eliminated',
-                currentRound: 'round_1',
-                currentMatch: null,
-                matchesPlayed: 1,
-                roundsWon: [],
-                hasPlayed: true
-              },
-              {
-                id: 'p4',
-                name: 'Vikram Singh',
-                email: 'vikram.singh@example.com',
-                skill: 'Intermediate',
-                profilePic: 'https://i.pravatar.cc/150?img=18',
-                selected: false,
-                status: 'eliminated',
-                currentRound: 'round_1',
-                currentMatch: null,
-                matchesPlayed: 1,
-                roundsWon: [],
-                hasPlayed: true
-              }
-            ]
-          },
-          {
-            id: 'round_2',
-            name: 'Final',
-            displayName: 'Championship Final',
-            roundNumber: 2,
-            totalMatches: 1,
-            completedMatches: 1,
-            status: 'completed',
-            isFrozen: true,
-            players: [
-              {
-                id: 'p1',
-                name: 'Arjun Mehta',
-                email: 'arjun.mehta@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=8',
-                selected: false,
-                status: 'winner',
-                currentRound: 'round_2',
-                currentMatch: 'round_2-match-1',
-                matchesPlayed: 2,
-                roundsWon: ['round_1', 'round_2'],
-                hasPlayed: true
-              },
-              {
-                id: 'p3',
-                name: 'Tanya Saxena',
-                email: 'tanya.saxena@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=4',
-                selected: false,
-                status: 'eliminated',
-                currentRound: 'round_2',
-                currentMatch: 'round_2-match-1',
-                matchesPlayed: 2,
-                roundsWon: ['round_1'],
-                hasPlayed: true
-              }
-            ],
-            matches: [
-              {
-                id: 'round_2-match-1',
-                player1: {
-                  id: 'p1',
-                  name: 'Arjun Mehta',
-                  email: 'arjun.mehta@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=8',
-                  selected: false,
-                  status: 'winner',
-                  currentRound: 'round_2',
-                  currentMatch: 'round_2-match-1',
-                  matchesPlayed: 2,
-                  roundsWon: ['round_1', 'round_2'],
-                  hasPlayed: true
-                },
-                player2: {
-                  id: 'p3',
-                  name: 'Tanya Saxena',
-                  email: 'tanya.saxena@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=4',
-                  selected: false,
-                  status: 'eliminated',
-                  currentRound: 'round_2',
-                  currentMatch: 'round_2-match-1',
-                  matchesPlayed: 2,
-                  roundsWon: ['round_1'],
-                  hasPlayed: true
-                },
-                status: 'completed',
-                startTime: '2025-11-15T15:30:00.000Z',
-                endTime: '2025-11-15T16:05:00.000Z',
-                duration: '35m',
-                score: '5-4',
-                winner: {
-                  id: 'p1',
-                  name: 'Arjun Mehta',
-                  email: 'arjun.mehta@example.com',
-                  skill: 'Advanced',
-                  profilePic: 'https://i.pravatar.cc/150?img=8',
-                  selected: false,
-                  status: 'winner',
-                  currentRound: 'round_2',
-                  currentMatch: 'round_2-match-1',
-                  matchesPlayed: 2,
-                  roundsWon: ['round_1', 'round_2'],
-                  hasPlayed: true
-                }
-              }
-            ],
-            winners: [
-              {
-                id: 'p1',
-                name: 'Arjun Mehta',
-                email: 'arjun.mehta@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=8',
-                selected: false,
-                status: 'winner',
-                currentRound: 'round_2',
-                currentMatch: null,
-                matchesPlayed: 2,
-                roundsWon: ['round_1', 'round_2'],
-                hasPlayed: true,
-                title: 'Champion' // Winner title
-              }
-            ],
-            losers: [
-              {
-                id: 'p3',
-                name: 'Tanya Saxena',
-                email: 'tanya.saxena@example.com',
-                skill: 'Advanced',
-                profilePic: 'https://i.pravatar.cc/150?img=4',
-                selected: false,
-                status: 'eliminated',
-                currentRound: 'round_2',
-                currentMatch: null,
-                matchesPlayed: 2,
-                roundsWon: ['round_1'],
-                hasPlayed: true
-              }
-            ]
-          }
-        ];
-        // End of commented static data
-        */
-        console.log("playersResponse", playersResponse.data?.tournament_status?.rounds);
-        
-        // Get rounds from API response
-        const apiRounds = playersResponse.data?.tournament_status?.rounds || [];
-        console.log('📊 API Rounds received:', apiRounds.length, 'rounds');
-        console.log('📊 Sample API Round structure:', apiRounds[0]);
-        
-        // Helper function to find player from registeredPlayers by ID or customerProfileId
-        const findPlayerFromRegistered = (playerId: string, customerId?: string): any => {
-          return registeredPlayers.find((p: any) => 
-            p.id?.toString() === playerId?.toString() || 
-            p.customerProfileId === playerId || 
-            p.customerProfileId === customerId ||
-            p.userId === playerId ||
-            p.id === playerId
-          );
-        };
-        
-        // Map API rounds to TournamentRound interface
-        const mappedRounds: TournamentRound[] = apiRounds.map((apiRound: any, index: number) => {
-          console.log(`📊 Mapping round ${index + 1}:`, {
-            roundId: apiRound.id,
-            roundName: apiRound.name,
-            playersCount: apiRound.players?.length || 0,
-            matchesCount: apiRound.matches?.length || 0,
-            samplePlayer: apiRound.players?.[0],
-            sampleMatch: apiRound.matches?.[0]
-          });
-          
-          // Map players from API round - handle both full objects and IDs
-          const mappedPlayers: Player[] = (apiRound.players || []).map((playerData: any) => {
-            // If playerData is just an ID string, look it up from registeredPlayers
-            let player: any = playerData;
-            if (typeof playerData === 'string') {
-              const foundPlayer = findPlayerFromRegistered(playerData);
-              if (foundPlayer) {
-                player = foundPlayer;
-              } else {
-                console.warn(`⚠️ Player not found in registeredPlayers for ID: ${playerData}`);
-                player = { id: playerData, customerProfileId: playerData };
-              }
-            } else if (playerData.customerId && !playerData.name) {
-              // If it's an object with only customerId, look it up
-              const foundPlayer = findPlayerFromRegistered(playerData.customerId);
-              if (foundPlayer) {
-                player = { ...playerData, ...foundPlayer };
-              }
-            }
-            
-            // Extract player information with multiple fallback options
-            const playerId = player.id || player.customerId || player.customerProfileId || player.userId || `player_${index}_${Math.random()}`;
-            const playerName = player.name || player.fullName || `${player.firstName || ''} ${player.lastName || ''}`.trim() || 'Unknown Player';
-            const playerDisplayName = player.displayName || player.customerDisplayName || playerName; // Use displayName from API, fallback to name
-            const playerEmail = player.email || '';
-            const playerSkill = player.skill || player.skillLevel || 'Intermediate';
-            const playerProfilePic = player.profilePic || player.avatar || player.profilePicture || 
-              (player.id ? `https://i.pravatar.cc/150?img=${player.id}` : DEFAULT_AVATAR);
-            
-            console.log(`📊 Mapped player:`, {
-              original: playerData,
-              mapped: {
-                id: playerId,
-                name: playerName,
-                displayName: playerDisplayName,
-                email: playerEmail,
-                profilePic: playerProfilePic
-              }
-            });
-            
-            return {
-              id: playerId.toString(),
-              name: playerName,
-              displayName: playerDisplayName,
-              email: playerEmail,
-              skill: playerSkill,
-              profilePic: playerProfilePic,
-              selected: false,
-              status: player.status || playerData.status || 'available',
-              currentRound: apiRound.id || null,
-              currentMatch: null,
-              matchesPlayed: player.matchesPlayed || playerData.matchesPlayed || 0,
-              roundsWon: player.roundsWon || playerData.roundsWon || [],
-              hasPlayed: player.hasPlayed || playerData.hasPlayed || false,
-              customerProfileId: player.customerId || player.customerProfileId || player.id || playerData.customerId || playerData.customerProfileId || null,
-              title: player.title || playerData.title || undefined // Include title if available
-            };
-          });
-          
-          // Map matches from API round
-          const mappedMatches: TournamentMatch[] = (apiRound.matches || []).map((match: any) => {
-            // Find player1 - try multiple ways
-            let player1: Player | undefined = mappedPlayers.find(p => 
-              p.id === match.player1Id?.toString() || 
-              p.customerProfileId === match.player1Id ||
-              p.id === match.player1?.id?.toString() ||
-              p.customerProfileId === match.player1?.customerId ||
-              p.customerProfileId === match.player1?.customerProfileId
-            );
-            
-            // If not found in mappedPlayers, try to find in registeredPlayers
-            if (!player1 && match.player1Id) {
-              const foundPlayer = findPlayerFromRegistered(match.player1Id);
-              if (foundPlayer) {
-                player1 = {
-                  id: foundPlayer.id?.toString() || foundPlayer.customerProfileId || match.player1Id,
-                  name: foundPlayer.name || foundPlayer.fullName || match.player1Name || 'Unknown',
-                  email: foundPlayer.email || '',
-                  skill: foundPlayer.skill || foundPlayer.skillLevel || 'Intermediate',
-                  profilePic: getAvatar(foundPlayer.profilePic || foundPlayer.avatar),
-                  selected: false,
-                  status: 'available' as const,
-                  customerProfileId: foundPlayer.customerProfileId || foundPlayer.userId || match.player1Id
-                };
-              }
-            }
-            
-            // If still not found, create a fallback player
-            if (!player1) {
-              player1 = {
-                id: match.player1Id || match.player1?.id || 'unknown',
-                name: match.player1Name || match.player1?.name || 'Unknown Player',
-                email: match.player1?.email || '',
-                skill: match.player1?.skill || 'Intermediate',
-                profilePic: getAvatar(match.player1?.profilePic || match.player1?.avatar),
-                selected: false,
-                status: 'available' as const,
-                customerProfileId: match.player1Id || match.player1?.customerId || null
-              };
-            }
-            
-            // Find player2 - try multiple ways
-            let player2: Player | undefined = mappedPlayers.find(p => 
-              p.id === match.player2Id?.toString() || 
-              p.customerProfileId === match.player2Id ||
-              p.id === match.player2?.id?.toString() ||
-              p.customerProfileId === match.player2?.customerId ||
-              p.customerProfileId === match.player2?.customerProfileId
-            );
-            
-            // If not found in mappedPlayers, try to find in registeredPlayers
-            if (!player2 && match.player2Id) {
-              const foundPlayer = findPlayerFromRegistered(match.player2Id);
-              if (foundPlayer) {
-                player2 = {
-                  id: foundPlayer.id?.toString() || foundPlayer.customerProfileId || match.player2Id,
-                  name: foundPlayer.name || foundPlayer.fullName || match.player2Name || 'Unknown',
-                  email: foundPlayer.email || '',
-                  skill: foundPlayer.skill || foundPlayer.skillLevel || 'Intermediate',
-                  profilePic: getAvatar(foundPlayer.profilePic || foundPlayer.avatar),
-                  selected: false,
-                  status: 'available' as const,
-                  customerProfileId: foundPlayer.customerProfileId || foundPlayer.userId || match.player2Id
-                };
-              }
-            }
-            
-            // If still not found, create a fallback player
-            if (!player2) {
-              player2 = {
-                id: match.player2Id || match.player2?.id || 'unknown',
-                name: match.player2Name || match.player2?.name || 'Unknown Player',
-                email: match.player2?.email || '',
-                skill: match.player2?.skill || 'Intermediate',
-                profilePic: getAvatar(match.player2?.profilePic || match.player2?.avatar),
-                selected: false,
-                status: 'available' as const,
-                customerProfileId: match.player2Id || match.player2?.customerId || null
-              };
-            }
-            
-            // Find winner - try multiple approaches
-            let winner: Player | undefined = undefined;
-            
-            // First, try to find winner from match.winnerId
-            if (match.winnerId) {
-              // Try to find in mappedPlayers first
-              winner = mappedPlayers.find(p => 
-                p.id === match.winnerId?.toString() || 
-                p.customerProfileId === match.winnerId?.toString() ||
-                p.id === match.winnerId ||
-                p.customerProfileId === match.winnerId ||
-                (p.customerProfileId && p.customerProfileId.toString() === match.winnerId?.toString())
-              );
-              
-              // If not found, try to find in registeredPlayers
-              if (!winner) {
-                const foundWinner = findPlayerFromRegistered(match.winnerId);
-                if (foundWinner) {
-                  winner = {
-                    id: foundWinner.id?.toString() || foundWinner.customerProfileId || match.winnerId,
-                    name: foundWinner.name || foundWinner.fullName || 'Unknown',
-                    email: foundWinner.email || '',
-                    skill: foundWinner.skill || foundWinner.skillLevel || 'Intermediate',
-                    profilePic: getAvatar(foundWinner.profilePic || foundWinner.avatar),
-                    selected: false,
-                    status: 'winner' as const,
-                    customerProfileId: foundWinner.customerProfileId || foundWinner.userId || match.winnerId
-                  };
-                }
-              }
-            }
-            
-            // If still no winner, try to match winner from match.winner object
-            if (!winner && match.winner) {
-              const winnerData = match.winner;
-              // Try to find in mappedPlayers
-              winner = mappedPlayers.find(p => 
-                p.id === winnerData.id?.toString() ||
-                p.customerProfileId === winnerData.id?.toString() ||
-                p.id === winnerData.customerId?.toString() ||
-                p.customerProfileId === winnerData.customerId?.toString() ||
-                p.customerProfileId === winnerData.customerProfileId?.toString()
-              );
-              
-              // If not found, create from winner object
-              if (!winner) {
-                const foundWinner = findPlayerFromRegistered(winnerData.id || winnerData.customerId || winnerData.customerProfileId);
-                if (foundWinner) {
-                  winner = {
-                    id: foundWinner.id?.toString() || foundWinner.customerProfileId || winnerData.id || 'unknown',
-                    name: foundWinner.name || foundWinner.fullName || winnerData.name || 'Unknown',
-                    email: foundWinner.email || winnerData.email || '',
-                    skill: foundWinner.skill || foundWinner.skillLevel || winnerData.skill || 'Intermediate',
-                    profilePic: getAvatar(foundWinner.profilePic || foundWinner.avatar || winnerData.profilePic),
-                    selected: false,
-                    status: 'winner' as const,
-                    customerProfileId: foundWinner.customerProfileId || foundWinner.userId || winnerData.customerId || winnerData.customerProfileId
-                  };
-                } else {
-                  // Create fallback winner from winnerData
-                  winner = {
-                    id: winnerData.id?.toString() || winnerData.customerId?.toString() || winnerData.customerProfileId?.toString() || 'unknown',
-                    name: winnerData.name || winnerData.fullName || 'Unknown Winner',
-                    email: winnerData.email || '',
-                    skill: winnerData.skill || winnerData.skillLevel || 'Intermediate',
-                    profilePic: getAvatar(winnerData.profilePic || winnerData.avatar),
-                    selected: false,
-                    status: 'winner' as const,
-                    customerProfileId: winnerData.customerId || winnerData.customerProfileId || winnerData.id
-                  };
-                }
-              }
-            }
-            
-            // After finding winner, ensure it matches one of the players in the match
-            // This is critical for highlighting to work
-            if (winner) {
-              // Check if winner matches player1 or player2 by comparing IDs
-              const winnerMatchesPlayer1 = 
-                winner.id === player1.id ||
-                winner.customerProfileId === player1.customerProfileId ||
-                (winner.customerProfileId && winner.customerProfileId.toString() === player1.customerProfileId?.toString()) ||
-                (winner.id && winner.id.toString() === player1.id?.toString());
-                
-              const winnerMatchesPlayer2 = 
-                winner.id === player2.id ||
-                winner.customerProfileId === player2.customerProfileId ||
-                (winner.customerProfileId && winner.customerProfileId.toString() === player2.customerProfileId?.toString()) ||
-                (winner.id && winner.id.toString() === player2.id?.toString());
-              
-              // If winner matches player1, use player1 as winner (to ensure ID consistency)
-              if (winnerMatchesPlayer1 && !winnerMatchesPlayer2) {
-                winner = { ...player1, status: 'winner' as const };
-              }
-              // If winner matches player2, use player2 as winner (to ensure ID consistency)
-              else if (winnerMatchesPlayer2 && !winnerMatchesPlayer1) {
-                winner = { ...player2, status: 'winner' as const };
-              }
-              
-              console.log('🏆 Winner matching:', {
-                matchId: match.id,
-                winnerId: winner.id,
-                winnerCustomerId: winner.customerProfileId,
-                player1Id: player1.id,
-                player1CustomerId: player1.customerProfileId,
-                player2Id: player2.id,
-                player2CustomerId: player2.customerProfileId,
-                matchesPlayer1: winnerMatchesPlayer1,
-                matchesPlayer2: winnerMatchesPlayer2,
-                finalWinnerId: winner.id
-              });
-            }
-            
-            // Normalize match status from API to expected values
-            let normalizedStatus: 'pending' | 'active' | 'completed' = 'pending';
-            const apiStatus = (match.status || '').toLowerCase();
-            if (apiStatus === 'completed' || apiStatus === 'finished' || apiStatus === 'done' || apiStatus === 'closed') {
-              normalizedStatus = 'completed';
-            } else if (apiStatus === 'active' || apiStatus === 'started' || apiStatus === 'in_progress' || apiStatus === 'ongoing' || apiStatus === 'running') {
-              normalizedStatus = 'active';
-            } else {
-              normalizedStatus = 'pending';
-            }
-            
-            console.log('📊 Match status mapping:', {
-              apiStatus: match.status,
-              normalizedStatus: normalizedStatus,
-              matchId: match.id
-            });
-            
-            return {
-              id: match.id || `match_${index}_${Math.random()}`,
-              apiMatchId: match.id,
-              player1: player1,
-              player2: player2,
-              status: normalizedStatus,
-              startTime: match.startTime,
-              endTime: match.endTime,
-              duration: match.duration,
-              score: match.score,
-              winner: winner
-            };
-          });
-          
-          // Map winners from API round (players with status 'winner' or from completed matches)
-          // First, get winners from completed matches
-          const winnersFromMatches = mappedMatches
-            .filter(m => m.status === 'completed' && m.winner)
-            .map(m => m.winner!)
-            .filter((winner, index, self) => 
-              index === self.findIndex(w => w.id === winner.id)
-            );
-          
-          // Then, get winners from players array with status 'winner'
-          const winnersFromPlayers = mappedPlayers.filter(p => p.status === 'winner');
-          
-          // Combine both, prioritizing winners from matches
-          const allWinners = [...winnersFromMatches];
-          winnersFromPlayers.forEach(wp => {
-            if (!allWinners.find(w => w.id === wp.id)) {
-              allWinners.push(wp);
-            }
-          });
-          
-          const mappedWinners: Player[] = allWinners;
-          
-          // Map losers from API round
-          const mappedLosers: Player[] = mappedPlayers.filter(p => p.status === 'eliminated' || p.status === 'loser');
-          
-          return {
-            id: apiRound.id || `round_${index + 1}`,
-            name: apiRound.name || `Round ${index + 1}`,
-            displayName: apiRound.displayName || apiRound.name,
-            apiRoundId: apiRound.id,
-            roundNumber: apiRound.roundNumber || index + 1,
-            totalMatches: apiRound.totalMatches || mappedMatches.length,
-            completedMatches: apiRound.completedMatches || mappedMatches.filter(m => m.status === 'completed').length,
-            players: mappedPlayers,
-            matches: mappedMatches,
-            winners: mappedWinners,
-            losers: mappedLosers,
-            status: apiRound.status || 'pending',
-            isFrozen: apiRound.isFrozen || false
-          };
-        });
-        
-        console.log('✅ Mapped rounds:', mappedRounds.length, 'rounds with structure:', mappedRounds.map(r => ({
-          id: r.id,
-          name: r.name,
-          players: r.players.length,
-          matches: r.matches.length,
-          winners: r.winners.length
-        })));
-        
-        // Helper function to collect all player IDs that are already in rounds
-        const getPlayersInRounds = (rounds: TournamentRound[]): Set<string> => {
-          const playerIds = new Set<string>();
-          rounds.forEach(round => {
-            // Add players from round.players
-            round.players.forEach(p => {
-              if (p.customerProfileId) playerIds.add(p.customerProfileId);
-              if (p.id) playerIds.add(p.id);
-            });
-            // Add players from round.winners
-            round.winners.forEach(p => {
-              if (p.customerProfileId) playerIds.add(p.customerProfileId);
-              if (p.id) playerIds.add(p.id);
-            });
-            // Add players from round.matches
-            round.matches.forEach(m => {
-              if (m.player1?.customerProfileId) playerIds.add(m.player1.customerProfileId);
-              if (m.player1?.id) playerIds.add(m.player1.id);
-              if (m.player2?.customerProfileId) playerIds.add(m.player2.customerProfileId);
-              if (m.player2?.id) playerIds.add(m.player2.id);
-              if (m.winner?.customerProfileId) playerIds.add(m.winner.customerProfileId);
-              if (m.winner?.id) playerIds.add(m.winner.id);
-            });
-          });
-          return playerIds;
-        };
 
-        const playersInRounds = getPlayersInRounds(mappedRounds);
-        console.log('👥 Players already in rounds:', Array.from(playersInRounds));
+        // Map API rounds data to TournamentRound interface
+        const mappedRounds: TournamentRound[] = apiRounds.map((round: any) => ({
+          id: round.id || round.roundId || `round-${round.roundNumber || 1}`,
+          name: round.name || round.roundName || `Round ${round.roundNumber || 1}`,
+          displayName: round.displayName || round.roundDisplayName,
+          players: (round.players || []).map((player: any) => ({
+            id: player.id?.toString() || player.playerId?.toString() || '',
+            name: player.name || player.fullName || '',
+            email: player.email || '',
+            skill: player.skillLevel || player.skill || 'Beginner',
+            profilePic: player.profilePic || player.avatar || '',
+            selected: false,
+            status: (player.status as Player['status']) || 'available',
+            currentRound: round.id || round.roundId,
+            currentMatch: player.currentMatch || null,
+            matchesPlayed: player.matchesPlayed || 0,
+            isPreviousRoundWinner: player.isPreviousRoundWinner || false,
+            originalWinnerRoundId: player.originalWinnerRoundId || null,
+            previousWinningRoundId: player.previousWinningRoundId || null,
+            lastWinningRound: player.lastWinningRound || null,
+            lastRoundPlayedNumber: player.lastRoundPlayedNumber || null,
+            roundsWon: player.roundsWon || []
+          })),
+          matches: (round.matches || []).map((match: any) => ({
+            id: match.id || match.matchId || '',
+            player1: match.player1 || match.players?.[0],
+            player2: match.player2 || match.players?.[1],
+            status: (match.status as TournamentMatch['status']) || 'pending',
+            startTime: match.startTime,
+            endTime: match.endTime,
+            duration: match.duration,
+            score: match.score,
+            winner: match.winner
+          })),
+          winners: (round.winners || []).map((winner: any) => ({
+            id: winner.id?.toString() || winner.playerId?.toString() || '',
+            name: winner.name || winner.fullName || '',
+            email: winner.email || '',
+            skill: winner.skillLevel || winner.skill || 'Beginner',
+            profilePic: winner.profilePic || winner.avatar || '',
+            selected: false,
+            status: 'available' as const,
+            currentRound: null,
+            currentMatch: null
+          })),
+          losers: (round.losers || []).map((loser: any) => ({
+            id: loser.id?.toString() || loser.playerId?.toString() || '',
+            name: loser.name || loser.fullName || '',
+            email: loser.email || '',
+            skill: loser.skillLevel || loser.skill || 'Beginner',
+            profilePic: loser.profilePic || loser.avatar || '',
+            selected: false,
+            status: 'available' as const,
+            currentRound: null,
+            currentMatch: null
+          })),
+          status: (round.status as TournamentRound['status']) || 'pending',
+          isFrozen: round.isFrozen || round.isFreezed || false
+        }));
 
-        // Map all registered players, but mark those in rounds as 'in_round'
-        const allPlayersMapped = registeredPlayers.map((player: any) => {
-          const playerId = player.customerProfileId || player.userId || player.id?.toString();
-          const isInRound = playerId && playersInRounds.has(playerId);
-          const playerName = player.name || player.fullName || 'Unknown Player';
-          const playerDisplayName = player.displayName || player.customerDisplayName || playerName;
-          
-          return {
+        const tournamentData: TournamentDashboard = {
+          id: tournamentIdNumber,
+          name: apiTournament?.name || tournamentName,
+          gameType: apiTournament?.gameType || '9-ball',
+          organizerName: apiTournament?.organizer?.name || 'Tournament Organizer',
+          organizerDescription: apiTournament?.description || 'Professional tournament management',
+          date: apiTournament?.startDate ? new Date(apiTournament.startDate).toISOString() : new Date('2025-10-15T14:00:00').toISOString(),
+          time: apiTournament?.startDate ? new Date(apiTournament.startDate).toLocaleTimeString() : new Date('2025-10-15T14:00:00').toLocaleTimeString(),
+          status: apiTournament?.status || 'active',
+          players: currentParticipants,
+          maxPlayers: apiTournament?.maxParticipants || 50,
+          entryFee: apiTournament?.entryFee || 50,
+          venue: apiTournament?.venue || 'Delhi Sports Complex - Main Branch',
+          ballRules: apiTournament?.rules || 'Standard tournament rules',
+          allPlayers: registeredPlayers.map((player: any) => ({
             id: player.id.toString(),
-            name: playerName,
-            displayName: playerDisplayName,
+            name: player.name,
             email: player.email,
             skill: player.skillLevel,
             profilePic: player.profilePic,
             selected: false,
-            status: isInRound ? 'in_round' as const : 'available' as const,
-            currentRound: isInRound ? mappedRounds.find(r => 
-              r.players.some(p => (p.customerProfileId || p.id) === playerId) ||
-              r.winners.some(p => (p.customerProfileId || p.id) === playerId)
-            )?.id || null : null,
-            currentMatch: null,
-            customerProfileId: player.customerProfileId || player.userId || null // Store for API calls
-          };
-        });
-
-        const tournamentData: TournamentDashboard = {
-          id: tournamentIdNumber,
-          name: tournamentName,
-          gameType: '9-ball', // Default, can be updated from API if needed
-          organizerName: 'Tournament Organizer',
-          organizerDescription: 'Professional tournament management',
-          date: new Date('2025-10-15T14:00:00').toISOString(),
-          time: new Date('2025-10-15T14:00:00').toLocaleTimeString(),
-          status: 'active',
-          players: currentParticipants,
-          maxPlayers: 50,
-          entryFee: 50,
-          venue: 'Delhi Sports Complex - Main Branch',
-          ballRules: 'Standard tournament rules',
-          allPlayers: allPlayersMapped,
-          rounds: mappedRounds, // Use mapped API rounds
-          currentRound: null,
+            status: 'available' as const,
+            currentRound: null,
+            currentMatch: null
+          })),
+          rounds: mappedRounds,
+          currentRound: mappedRounds.length > 0 ? mappedRounds[0].id : null,
           tournamentStarted: true,
           registeredPlayers: registeredPlayers,
           tournamentId: tournamentId // Store original tournament ID string for API calls
         };
 
-
         // Navigate directly to tournament dashboard (skip modal)
-        /*this.setState({
+        this.setState({
           currentGameMatch: tournamentData,
           showGameOrganization: true,
           showTournamentModal: false, // Don't show popup
-          selectedTournament: null,
-          loading: false
-        });*/
-
-
-        /*
-        this.setState({
-          currentGameMatch: {
-            ...tournamentData,
-            rounds: staticRounds,
-            currentRound: tournamentData.currentRound ?? initialRoundId
-          },
-          rounds: staticRounds,
-          activeRoundTab: initialRoundId,
-          activeRoundSubTab: initialRoundId
-            ? { ...this.state.activeRoundSubTab, [initialRoundId]: 'players' }
-            : {},
-          showGameOrganization: true,
-          showTournamentModal: false,
-          selectedTournament: null,
-          loading: false
-        });*/
-
-        // Use only mapped rounds from API - no fallback to static data
-        const roundsToUse = mappedRounds;
-        console.log('📊 Final rounds to use (API only):', roundsToUse.length, 'rounds');
-        
-        // Only set initialRoundId if we have rounds
-        const initialRoundId = roundsToUse.length > 0 ? roundsToUse[0]?.id ?? null : null;
-
-        // Extract displayNames from existing rounds and map to standard names
-        const existingRoundDisplayNames = roundsToUse
-          .map(round => round.displayName || round.name)
-          .filter(Boolean);
-        
-        // Map round name variations - if any variation exists, hide all related variations
-        const roundNameGroups: { [key: string]: string[] } = {
-          'Semi Final': ['Semi Final', 'Semi Finals'],
-          'Final': ['Final', 'Championship Final'],
-          'Grand Final': ['Grand Final', 'Final'],
-          'Quarter Final': ['Quarter Final', 'Quarter Finals'],
-          'First Round': ['First Round'],
-          'Second Round': ['Second Round'],
-          'Third Round': ['Third Round'],
-          'Fourth Round': ['Fourth Round'],
-          'Fifth Round': ['Fifth Round'],
-          'Sixth Round': ['Sixth Round'],
-          'Seventh Round': ['Seventh Round'],
-          'Eighth Round': ['Eighth Round'],
-          'Ninth Round': ['Ninth Round'],
-          'Tenth Round': ['Tenth Round'],
-          'Round of 32': ['Round of 32'],
-          'Round of 16': ['Round of 16'],
-          'Round of 8': ['Round of 8']
-        };
-        
-        // Build list of names to hide based on existing rounds
-        const namesToHide = new Set<string>();
-        existingRoundDisplayNames.forEach(displayName => {
-          // Add the exact displayName
-          namesToHide.add(displayName);
-          
-          // Find matching group and add all variations
-          for (const [groupKey, variations] of Object.entries(roundNameGroups)) {
-            if (variations.some(v => v.toLowerCase() === displayName.toLowerCase())) {
-              variations.forEach(variation => namesToHide.add(variation));
-              break; // Found match, no need to check other groups
-            }
-          }
-        });
-        
-        const usedRoundNames = Array.from(namesToHide);
-
-        const winnersToDisplay = roundsToUse
-  .flatMap(round =>
-    round.matches
-      .filter(match => match.status === 'completed' && match.winner)
-      .map(match => ({
-        player: { ...match.winner },
-        roundWon: round.displayName ?? round.name,
-        roundWonId: round.id,
-        matchId: match.id,
-        wonAt: match.endTime ? new Date(match.endTime) : new Date(),
-        // defaults for Set Winner Titles modal
-        rank: 1,
-        title: match.winner?.title || '', // Use title from winner if available
-        selected: true // Default to selected so they appear in Final Winners section
-      }))
-  )
-  // Also include winners from round.winners array (if they exist)
-  .concat(
-    roundsToUse.flatMap(round =>
-      (round.winners || [])
-        .filter(winner => winner && winner.id)
-        .map(winner => ({
-          player: { ...winner },
-          roundWon: round.displayName ?? round.name,
-          roundWonId: round.id,
-          matchId: '', // No specific match ID for winners from winners array
-          wonAt: new Date(), // Use current date as fallback
-          rank: 1,
-          title: winner.title || '', // Use title from winner if available
-          selected: true // Default to selected
-        }))
-    )
-  )
-  // keep only the most recent win per player
-  .reduce((acc, entry) => {
-    const idx = acc.findIndex(item => item.player.id === entry.player.id);
-    if (idx === -1 || ((entry.wonAt?.getTime() ?? 0) > (acc[idx].wonAt?.getTime() ?? 0))) {
-      if (idx === -1) acc.push(entry);
-      else acc[idx] = entry;
-    }
-    return acc;
-  }, [] as Array<{
-    player: Player;
-    roundWon: string;
-    roundWonId: string;
-    matchId: string;
-    wonAt: Date;
-    rank: number;
-    title: string;
-    selected: boolean;
-  }>)
-  // assign sequential ranks for display
-  .map((winner, index) => ({ ...winner, rank: index + 1 }));
-  
-  console.log('🏆 Winners to Display:', {
-    total: winnersToDisplay.length,
-    selected: winnersToDisplay.filter(w => w.selected).length,
-    winners: winnersToDisplay.map(w => ({
-      name: w.player.name,
-      selected: w.selected,
-      title: w.title,
-      roundWon: w.roundWon
-    }))
-  });
-
-  this.setState({
-    currentGameMatch: {
-      ...tournamentData,
-      rounds: roundsToUse, // Use mapped API rounds
-      currentRound: initialRoundId
-    },
-    rounds: roundsToUse, // Set rounds state to mapped API rounds so dashboard displays them
-    winnersToDisplay,
-    usedRoundNames, // Add usedRoundNames to hide existing rounds in modal
-    activeRoundTab: initialRoundId,
-    activeRoundSubTab: initialRoundId ? { [initialRoundId]: 'players' } : {},
-    showGameOrganization: true,
-    showTournamentModal: false,
           selectedTournament: null,
           loading: false
         });
@@ -2758,47 +1476,6 @@ selectedRoundDisplayName: '',
         showGameOrganization: false,
         showTournamentModal: false
       });
-    }
-  };
-
-  private handleDeleteTournament = async (tournamentId: string, tournamentName: string): Promise<void> => {
-    // Confirm deletion
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${tournamentName}"?\n\n` +
-      'This action cannot be undone. All related data (rounds, matches, registrations, winners) will be permanently deleted.'
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    this.setState({ loading: true });
-
-    try {
-      console.log('🗑️ Deleting tournament:', tournamentId);
-      const response = await matchesApiService.deleteTournament(tournamentId);
-      
-      if (response.success) {
-        console.log('✅ Tournament deleted successfully:', response.data);
-        this.showCustomAlert('Success', `Tournament "${tournamentName}" has been deleted successfully.`);
-        
-        // Remove tournament from state
-        this.setState({
-          apiTournaments: this.state.apiTournaments.filter(t => t.tournamentId !== tournamentId),
-          loading: false
-        });
-      } else {
-        throw new Error(response.message || 'Failed to delete tournament');
-      }
-    } catch (error) {
-      console.error('❌ Error deleting tournament:', error);
-      this.setState({ loading: false });
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        return;
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Failed to delete tournament';
-      this.showCustomAlert('Error', `Failed to delete tournament: ${errorMessage}`);
     }
   };
 
@@ -3159,8 +1836,7 @@ selectedRoundDisplayName: '',
           selected: false,
           status: 'available' as const, // available, in_round, in_match, in_lobby, eliminated
           currentRound: null,
-          currentMatch: null,
-          customerProfileId: player.customerProfileId || player.userId || player.customerId || null // Store for API calls
+          currentMatch: null
         })) || [],
         rounds: [],
         currentRound: null,
@@ -3219,8 +1895,7 @@ selectedRoundDisplayName: '',
             selected: false,
             status: 'available' as const,
             currentRound: null,
-            currentMatch: null,
-            customerProfileId: player.customerProfileId || player.userId || player.customerId || null // Store for API calls
+            currentMatch: null
           })) || [],
           rounds: [],
           currentRound: null,
@@ -3232,7 +1907,9 @@ selectedRoundDisplayName: '',
           currentGameMatch: tournamentData,
           showGameOrganization: true,
           showTournamentModal: false,
-          selectedTournament: null
+          selectedTournament: null,
+          activeRoundTab: activeRoundTab,
+          activeRoundSubTab: { [activeRoundTab]: 'matches' }
         });
       }
     }
@@ -3249,7 +1926,7 @@ selectedRoundDisplayName: '',
         name: player.name,
         email: player.email,
         skill: player.skillLevel || 'Beginner',
-        profilePic: getAvatar(player.profilePic),
+        profilePic: player.profilePic || '/default-avatar.png',
         selected: false,
         status: 'available' as const,
         currentRound: 'round_1',
@@ -3282,153 +1959,19 @@ selectedRoundDisplayName: '',
     this.setState({ rounds: updatedRounds });
   };
 
-  // Method to start a match - calls API
-  private startMatch = async (matchId: string): Promise<void> => {
-    console.log('🖱️ Old startMatch method called with matchId:', matchId);
-    
-    // Find the match and its round
-    let foundMatch: TournamentMatch | null = null;
-    let foundRound: TournamentRound | null = null;
-    
-    for (const round of this.state.rounds) {
-      const match = round.matches.find(m => m.id === matchId);
-      if (match) {
-        foundMatch = match;
-        foundRound = round;
-        break;
-      }
-    }
-    
-    // Also check currentGameMatch.rounds
-    if (!foundMatch && this.state.currentGameMatch?.rounds) {
-      for (const round of this.state.currentGameMatch.rounds) {
-        const match = round.matches.find(m => m.id === matchId);
-        if (match) {
-          foundMatch = match;
-          foundRound = round;
-          break;
-        }
-      }
-    }
-    
-    if (!foundMatch || !foundRound) {
-      console.error('❌ Match not found:', matchId);
-      this.showCustomAlert('Error', `Match with ID ${matchId} not found.`);
-      return;
-    }
-    
-    // Check if we have required data
-    if (!this.state.currentGameMatch?.tournamentId) {
-      console.error('❌ Tournament ID not found');
-      this.showCustomAlert('Error', 'Tournament ID not found. Cannot start match.');
-      return;
-    }
-    
-    if (!foundRound.apiRoundId) {
-      console.error('❌ Round missing apiRoundId');
-      this.showCustomAlert('Error', `Round "${foundRound.displayName || foundRound.name}" is missing API round ID.`);
-      return;
-    }
-    
-    const player1Id = foundMatch.player1.customerProfileId || foundMatch.player1.id;
-    const player2Id = foundMatch.player2.customerProfileId || foundMatch.player2.id;
-    
-    if (!player1Id || !player2Id) {
-      console.error('❌ Player IDs missing');
-      this.showCustomAlert('Error', 'Player IDs not found. Cannot start match.');
-      return;
-    }
-    
-    const tournamentId = this.state.currentGameMatch.tournamentId;
-    const roundId = foundRound.apiRoundId;
-    
-    console.log('🚀 Calling API from old startMatch method:', {
-      tournamentId,
-      roundId,
-      player1Id,
-      player2Id
-    });
-    
-    // Show loading state
-    this.setState({ loading: true });
-    
-    try {
-      const response = await matchesApiService.startMatch(
-        tournamentId,
-        roundId,
-        player1Id,
-        player2Id
-      );
-      
-      console.log('📥 API Response from old startMatch:', response);
-      
-      if (response.success || response.data || response.matchId) {
-        // Update local state
-        const apiMatchId = response.data?.matchId || response.data?.id || response.matchId || response.id;
-        const matchStatus = response.data?.status || response.status || 'active';
-        
+  // Method to move selected players to target round
+  private startMatch = (matchId: string): void => {
     const updatedRounds = this.state.rounds.map(round => ({
       ...round,
       matches: round.matches.map(match => 
         match.id === matchId 
-              ? { 
-                  ...match, 
-                  status: matchStatus === 'ongoing' ? 'active' as const : (matchStatus as 'pending' | 'active' | 'completed'),
-                  apiMatchId: apiMatchId,
-                  startTime: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
-                }
+          ? { ...match, status: 'active' as const }
           : match
       )
     }));
 
-        // Also update currentGameMatch.rounds
-        let updatedCurrentGameMatchRounds = this.state.currentGameMatch?.rounds;
-        if (updatedCurrentGameMatchRounds) {
-          updatedCurrentGameMatchRounds = updatedCurrentGameMatchRounds.map(round => ({
-            ...round,
-            matches: round.matches.map(match => 
-              match.id === matchId 
-                ? { 
-                    ...match, 
-                    status: matchStatus === 'ongoing' ? 'active' as const : (matchStatus as 'pending' | 'active' | 'completed'),
-                    apiMatchId: apiMatchId,
-                    startTime: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
-                  }
-                : match
-            )
-          }));
-        }
-        
-        this.setState({ 
-          rounds: updatedRounds,
-          currentGameMatch: {
-            ...this.state.currentGameMatch,
-            rounds: updatedCurrentGameMatchRounds
-          },
-          loading: false
-        });
-        
-        console.log(`✅ Started match via API: ${matchId}, API Match ID: ${apiMatchId}`);
-        this.showCustomAlert(
-          'Match Started',
-          `Match has been started successfully.\n\nMatch ID: ${apiMatchId || 'N/A'}`
-        );
-      } else {
-        throw new Error(response.message || 'Failed to start match');
-      }
-    } catch (error) {
-      console.error('❌ Error starting match:', error);
-      this.setState({ loading: false });
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        return;
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.showCustomAlert(
-        'Error Starting Match',
-        `Failed to start match: ${errorMessage}`
-      );
-    }
+    this.setState({ rounds: updatedRounds });
+    console.log(`Started match: ${matchId}`);
   };
 
   private cancelMatch = (matchId: string): void => {
@@ -3499,106 +2042,9 @@ selectedRoundDisplayName: '',
 
 
 
-  private selectWinner = async (winnerPlayer: Player): Promise<void> => {
+  private selectWinner = (winnerPlayer: Player): void => {
     if (!this.state.selectedMatchForWinner) return;
   
-    // Find the match and round first
-    let foundMatch: TournamentMatch | null = null;
-    let foundRound: TournamentRound | null = null;
-    
-    for (const round of this.state.rounds) {
-      const match = round.matches.find(m => m.id === this.state.selectedMatchForWinner);
-      if (match) {
-        foundMatch = match;
-        foundRound = round;
-        break;
-      }
-    }
-    
-    // Also check currentGameMatch.rounds
-    if (!foundMatch && this.state.currentGameMatch?.rounds) {
-      for (const round of this.state.currentGameMatch.rounds) {
-        const match = round.matches.find(m => m.id === this.state.selectedMatchForWinner);
-        if (match) {
-          foundMatch = match;
-          foundRound = round;
-          break;
-        }
-      }
-    }
-    
-    if (!foundMatch || !foundRound) {
-      console.error('❌ Match not found:', this.state.selectedMatchForWinner);
-      this.showCustomAlert('Error', 'Match not found. Cannot select winner.');
-      return;
-    }
-    
-    // Validate required data for API call
-    if (!this.state.currentGameMatch?.tournamentId) {
-      console.error('❌ Tournament ID not found');
-      this.showCustomAlert('Error', 'Tournament ID not found. Cannot complete match.');
-      return;
-    }
-    
-    if (!foundRound.apiRoundId) {
-      console.error('❌ Round missing apiRoundId');
-      this.showCustomAlert('Error', `Round "${foundRound.displayName || foundRound.name}" is missing API round ID.`);
-      return;
-    }
-    
-    if (!foundMatch.apiMatchId) {
-      console.error('❌ Match missing apiMatchId');
-      this.showCustomAlert('Error', 'Match is missing API match ID. Please start the match first.');
-      return;
-    }
-    
-    // Get winner ID (prefer customerProfileId)
-    const winnerId = winnerPlayer.customerProfileId || winnerPlayer.id;
-    if (!winnerId) {
-      console.error('❌ Winner ID missing');
-      this.showCustomAlert('Error', 'Winner ID not found. Cannot complete match.');
-      return;
-    }
-    
-    // Determine scores (winner gets higher score)
-    // For now, use default scores - winner gets 5, loser gets 4
-    // TODO: Add score input UI if needed
-    const isPlayer1Winner = foundMatch.player1.id === winnerPlayer.id;
-    const scorePlayer1 = isPlayer1Winner ? 5 : 4;
-    const scorePlayer2 = isPlayer1Winner ? 4 : 5;
-    
-    const tournamentId = this.state.currentGameMatch.tournamentId;
-    const roundId = foundRound.apiRoundId;
-    const matchId = foundMatch.apiMatchId;
-    
-    console.log('🏁 Completing match via API:', {
-      tournamentId,
-      roundId,
-      matchId,
-      winnerId,
-      scorePlayer1,
-      scorePlayer2,
-      winnerName: winnerPlayer.name
-    });
-    
-    // Show loading state
-    this.setState({ loading: true });
-    
-    try {
-      // Call API to complete match
-      const response = await matchesApiService.completeMatch(
-        tournamentId,
-        roundId,
-        matchId,
-        winnerId,
-        scorePlayer1,
-        scorePlayer2
-      );
-      
-      console.log('📥 API Response from completeMatch:', response);
-      
-      if (response.success || response.data) {
-        // API call successful - now update local state
     const updatedRounds = this.state.rounds.map(round => {
       // Find the current match to check if it already has a winner
       const currentMatch = round.matches.find(match => match.id === this.state.selectedMatchForWinner);
@@ -3688,24 +2134,10 @@ selectedRoundDisplayName: '',
         
         console.log(`📊 Final state: ${updatedWinners.length} winners, ${updatedLosers.length} losers`);
         
-        // Update the match with the new winner and score from API response
-        const apiScorePlayer1 = response.data?.scorePlayer1;
-        const apiScorePlayer2 = response.data?.scorePlayer2;
-        const apiEndTime = response.data?.endTime;
-        
+        // Update the match with the new winner
         const updatedMatches = round.matches.map(match => 
           match.id === this.state.selectedMatchForWinner 
-            ? { 
-                ...match, 
-                status: 'completed' as const, 
-                winner: winnerPlayer,
-                score: apiScorePlayer1 !== undefined && apiScorePlayer2 !== undefined 
-                  ? `${apiScorePlayer1}-${apiScorePlayer2}` 
-                  : match.score || `${scorePlayer1}-${scorePlayer2}`,
-                endTime: apiEndTime 
-                  ? new Date(apiEndTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
-                  : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
-              }
+            ? { ...match, status: 'completed' as const, winner: winnerPlayer }
             : match
         );
         
@@ -3752,123 +2184,21 @@ selectedRoundDisplayName: '',
   
       const updatedWinnersToDisplay = [newWinnerToDisplay, ...filteredWinnersToDisplay].slice(0, 5);
       
-      // Also update currentGameMatch.rounds
-      let updatedCurrentGameMatchRounds = this.state.currentGameMatch?.rounds;
-      if (updatedCurrentGameMatchRounds) {
-        updatedCurrentGameMatchRounds = updatedCurrentGameMatchRounds.map(r => {
-          const roundMatch = r.matches.find(m => m.id === this.state.selectedMatchForWinner);
-          if (roundMatch) {
-            const apiScorePlayer1 = response.data?.scorePlayer1;
-            const apiScorePlayer2 = response.data?.scorePlayer2;
-            const apiEndTime = response.data?.endTime;
-            
-            return {
-              ...r,
-              matches: r.matches.map(m => 
-                m.id === this.state.selectedMatchForWinner 
-                  ? { 
-                      ...m, 
-                      status: 'completed' as const, 
-                      winner: winnerPlayer,
-                      score: apiScorePlayer1 !== undefined && apiScorePlayer2 !== undefined 
-                        ? `${apiScorePlayer1}-${apiScorePlayer2}` 
-                        : m.score || `${scorePlayer1}-${scorePlayer2}`,
-                      endTime: apiEndTime 
-                        ? new Date(apiEndTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
-                        : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
-                    }
-                  : m
-              )
-            };
-          }
-          return r;
-        });
-      }
-      
       this.setState({ 
         rounds: updatedRounds,
-        currentGameMatch: {
-          ...this.state.currentGameMatch,
-          rounds: updatedCurrentGameMatchRounds
-        },
         winnerHistory: updatedWinnerHistory,
         winnersToDisplay: updatedWinnersToDisplay,
         showWinnerSelectionModal: false,
-        selectedMatchForWinner: null,
-        loading: false
+        selectedMatchForWinner: null
       });
       
-      console.log(`✅ Winner selection complete via API. New winner: ${winnerPlayer.name}`);
-      this.showCustomAlert(
-        'Match Completed',
-        `Match has been completed successfully.\n\nWinner: ${winnerPlayer.name}\nScore: ${scorePlayer1}-${scorePlayer2}`
-      );
+      console.log(`✅ Winner selection complete. New winner: ${winnerPlayer.name}`);
     } else {
-      // Also update currentGameMatch.rounds
-      let updatedCurrentGameMatchRounds = this.state.currentGameMatch?.rounds;
-      if (updatedCurrentGameMatchRounds) {
-        updatedCurrentGameMatchRounds = updatedCurrentGameMatchRounds.map(r => {
-          const roundMatch = r.matches.find(m => m.id === this.state.selectedMatchForWinner);
-          if (roundMatch) {
-            const apiScorePlayer1 = response.data?.scorePlayer1;
-            const apiScorePlayer2 = response.data?.scorePlayer2;
-            const apiEndTime = response.data?.endTime;
-            
-            return {
-              ...r,
-              matches: r.matches.map(m => 
-                m.id === this.state.selectedMatchForWinner 
-                  ? { 
-                      ...m, 
-                      status: 'completed' as const, 
-                      winner: winnerPlayer,
-                      score: apiScorePlayer1 !== undefined && apiScorePlayer2 !== undefined 
-                        ? `${apiScorePlayer1}-${apiScorePlayer2}` 
-                        : m.score || `${scorePlayer1}-${scorePlayer2}`,
-                      endTime: apiEndTime 
-                        ? new Date(apiEndTime).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
-                        : new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
-                    }
-                  : m
-              )
-            };
-          }
-          return r;
-        });
-      }
-      
       this.setState({ 
         rounds: updatedRounds,
-        currentGameMatch: {
-          ...this.state.currentGameMatch,
-          rounds: updatedCurrentGameMatchRounds
-        },
         showWinnerSelectionModal: false,
-        selectedMatchForWinner: null,
-        loading: false
+        selectedMatchForWinner: null
       });
-      
-      console.log(`✅ Winner selection complete via API. New winner: ${winnerPlayer.name}`);
-      this.showCustomAlert(
-        'Match Completed',
-        `Match has been completed successfully.\n\nWinner: ${winnerPlayer.name}\nScore: ${scorePlayer1}-${scorePlayer2}`
-      );
-    }
-    } else {
-      throw new Error(response.message || 'Failed to complete match');
-    }
-    } catch (error) {
-      console.error('❌ Error completing match:', error);
-      this.setState({ loading: false });
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        return;
-      }
-      const errorMessage = error instanceof Error ? error.message : 'Failed to complete match';
-      this.showCustomAlert(
-        'Error Completing Match',
-        `Failed to complete match: ${errorMessage}\n\nPlease try again.`
-      );
     }
   };
 
@@ -3930,58 +2260,6 @@ selectedRoundDisplayName: '',
 
   private hideTournamentResults = (): void => {
     this.setState({ showTournamentResults: false });
-  };
-
-  private handleCloseTournament = async (): Promise<void> => {
-    const tournamentId = this.state.currentGameMatch?.tournamentId;
-    
-    if (!tournamentId) {
-      this.showCustomAlert('Error', 'Tournament ID not found. Please refresh and try again.');
-      return;
-    }
-
-    // Confirm before closing
-    const confirmed = window.confirm(
-      'Are you sure you want to close this tournament?\n\n' +
-      'This action will mark the tournament as completed and cannot be undone.'
-    );
-
-    if (!confirmed) {
-      return;
-    }
-
-    this.setState({ loading: true });
-
-    try {
-      console.log('🔒 Closing tournament:', tournamentId);
-      const response = await matchesApiService.closeTournament(tournamentId);
-      
-      if (response.success) {
-        console.log('✅ Tournament closed successfully:', response.data);
-        this.showCustomAlert(
-          'Tournament Closed',
-          'The tournament has been successfully closed and marked as completed.'
-        );
-        
-        // Close the tournament dashboard and return to tournaments list
-        this.setState({
-          showGameOrganization: false,
-          currentGameMatch: null,
-          rounds: [],
-          loading: false
-        });
-      } else {
-        throw new Error(response.message || 'Failed to close tournament');
-      }
-    } catch (error) {
-      console.error('❌ Error closing tournament:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to close tournament';
-      this.setState({ loading: false });
-      this.showCustomAlert(
-        'Error Closing Tournament',
-        `Failed to close tournament: ${errorMessage}\n\nPlease check the console for more details.`
-      );
-    }
   };
 
   // Set Winner Titles Modal
@@ -4047,210 +2325,33 @@ selectedRoundDisplayName: '',
     this.setState({ rankedWinners: updatedWinners });
   };
 
-  private saveWinnerTitles = async (): Promise<void> => {
-    console.log('🎯 saveWinnerTitles function called');
-    console.log('🎯 Current state:', {
-      currentGameMatch: this.state.currentGameMatch,
-      rankedWinners: this.state.rankedWinners.length
-    });
-    
-    // Get tournament ID
-    const tournamentId = this.state.currentGameMatch?.tournamentId;
-    console.log('🎯 Tournament ID:', tournamentId);
-    
-    if (!tournamentId) {
-      console.error('❌ Tournament ID not found');
-      this.showCustomAlert('Error', 'Tournament ID not found. Please refresh and try again.');
-      return;
-    }
-
-    // Check if rankedWinners is empty
-    if (!this.state.rankedWinners || this.state.rankedWinners.length === 0) {
-      console.error('❌ No ranked winners found in state');
-      this.showCustomAlert('Error', 'No winners found. Please select winners first.');
-      return;
-    }
-
-    console.log('🎯 Ranked winners:', this.state.rankedWinners.map(w => ({
-      name: w.player.name,
-      selected: w.selected,
-      title: w.title,
-      customerProfileId: w.player.customerProfileId,
-      id: w.player.id
-    })));
-
-    // Predefined titles (must match exactly as they appear in the UI)
-    const predefinedTitles = ['Champion', 'Runner Up', 'Third Place', '4th Place'];
-
-    // Helper function to check if a string is a valid UUID
-    const isValidUUID = (str: string): boolean => {
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      return uuidRegex.test(str);
-    };
-
-    // Filter only selected winners and map to API format
-    const selectedWinners = this.state.rankedWinners
-      .filter(w => {
-        const isSelected = w.selected !== false; // Include winners that are selected (default to true)
-        console.log(`🎯 Winner ${w.player.name}: selected=${w.selected}, isSelected=${isSelected}`);
-        return isSelected;
-      })
-      .map((rankedWinner, index) => {
-        // Get title - use the current title or default based on rank
-        let title = rankedWinner.title || '';
-        
-        // If title is empty, use a default based on rank
-        if (!title || title.trim() === '') {
-          const defaultTitles = ['Champion', 'Runner Up', 'Third Place', '4th Place'];
-          const rankIndex = (rankedWinner.rank || (index + 1)) - 1;
-          title = defaultTitles[rankIndex] || `Rank ${rankedWinner.rank || (index + 1)}`;
-        }
-        
-        // Check if title is a predefined title (case-sensitive)
-        const isCustomTitle = !predefinedTitles.includes(title.trim());
-        
-        // Get customerProfileId from player (prefer customerProfileId, fallback to id)
-        const customerId = rankedWinner.player.customerProfileId || rankedWinner.player.id;
-        
-        console.log(`🎯 Processing winner ${rankedWinner.player.name}:`, {
-          customerProfileId: rankedWinner.player.customerProfileId,
-          id: rankedWinner.player.id,
-          customerId: customerId,
-          isValidUUID: customerId ? isValidUUID(customerId) : false,
-          title: title,
-          isCustomTitle: isCustomTitle
-        });
-        
-        if (!customerId) {
-          console.warn(`⚠️ No customer ID found for player: ${rankedWinner.player.name}`);
-        } else if (!isValidUUID(customerId)) {
-          console.warn(`⚠️ Invalid UUID format for player ${rankedWinner.player.name}: ${customerId}. This player will be skipped.`);
-        }
-
-        return {
-          customerId: customerId,
-          rank: rankedWinner.rank || (index + 1),
-          title: title.trim(),
-          isCustomTitle: isCustomTitle,
-          displayInResults: rankedWinner.selected !== false, // Default to true if not explicitly false
-          playerName: rankedWinner.player.name // Store for error messages
-        };
-      })
-      .filter(w => {
-        if (!w.customerId) {
-          console.warn(`⚠️ Filtering out winner without customerId: ${w.playerName}`);
-          return false;
-        }
-        if (!isValidUUID(w.customerId)) {
-          console.warn(`⚠️ Filtering out winner with invalid UUID: ${w.playerName} (${w.customerId})`);
-          return false;
-        }
-        return true;
-      })
-      .map(({ playerName, ...winner }) => winner); // Remove playerName before sending to API
-
-    console.log('🎯 Selected winners after filtering:', selectedWinners);
-
-    // Count how many winners were filtered out
-    const totalSelected = this.state.rankedWinners.filter(w => w.selected !== false).length;
-    const skippedCount = totalSelected - selectedWinners.length;
-
-    if (selectedWinners.length === 0) {
-      console.error('❌ No valid winners to save. Reasons:', {
-        rankedWinnersCount: this.state.rankedWinners.length,
-        selectedCount: totalSelected,
-        withValidUUID: this.state.rankedWinners.filter(w => {
-          const customerId = w.player.customerProfileId || w.player.id;
-          return customerId && isValidUUID(customerId);
-        }).length
-      });
-      this.showCustomAlert('Error', 'No winners with valid customer IDs found. Please ensure winners have valid customer profile IDs.');
-      return;
-    }
-
-    // Warn if some winners were skipped
-    if (skippedCount > 0) {
-      console.warn(`⚠️ ${skippedCount} winner(s) were skipped due to invalid or missing customer IDs`);
-    }
+  private saveWinnerTitles = (): void => {
+    // Update winnersToDisplay with the new titles and rankings
+    const updatedWinnersToDisplay = this.state.rankedWinners.map((rankedWinner, index) => ({
+      player: rankedWinner.player,
+      rank: index + 1,
+      title: rankedWinner.title,
+      roundWon: rankedWinner.roundWon,
+      roundWonId: this.state.winnersToDisplay.find(w => w.player.id === rankedWinner.player.id)?.roundWonId || '',
+      selected: rankedWinner.selected || false
+    }));
 
     console.log('💾 Saving winner titles:', {
-      tournamentId,
-      selectedWinnersCount: selectedWinners.length,
-      skippedCount: skippedCount,
-      winners: selectedWinners.map(w => ({ customerId: w.customerId, rank: w.rank, title: w.title, isCustom: w.isCustomTitle }))
-    });
-
-    // Show loading state
-    this.setState({ loading: true });
-
-    try {
-      // Call the API to save winner titles
-      console.log('🏆 Calling saveWinnerTitles API');
-      const response = await matchesApiService.saveWinnerTitles(tournamentId, selectedWinners);
-      
-      if (response.success) {
-        console.log('✅ Winner titles saved via API:', response.data);
-
-        // Update winnersToDisplay with the new titles and rankings from rankedWinners
-        // Preserve all existing properties and update with new titles/ranks
-        const updatedWinnersToDisplay = this.state.rankedWinners.map((rankedWinner, index) => {
-          // Find the original winner in winnersToDisplay to preserve roundWonId
-          const originalWinner = this.state.winnersToDisplay.find(w => w.player.id === rankedWinner.player.id);
-          
-          return {
-            player: rankedWinner.player,
-            rank: rankedWinner.rank || (index + 1),
-            title: rankedWinner.title || originalWinner?.title || '', // Use updated title from rankedWinners
-            roundWon: rankedWinner.roundWon || originalWinner?.roundWon || '',
-            roundWonId: originalWinner?.roundWonId || '',
-            selected: rankedWinner.selected !== false // Preserve selection state
-          };
-        });
-
-        console.log('🔄 Updating winnersToDisplay:', {
-          before: this.state.winnersToDisplay.length,
-          after: updatedWinnersToDisplay.length,
-          titles: updatedWinnersToDisplay.map(w => ({ name: w.player.name, title: w.title, rank: w.rank, selected: w.selected }))
+      rankedWinners: this.state.rankedWinners.length,
+      winnersToDisplay: updatedWinnersToDisplay.length,
+      titles: updatedWinnersToDisplay.map(w => ({ name: w.player.name, title: w.title, rank: w.rank }))
     });
 
     this.setState({ 
       winnersToDisplay: updatedWinnersToDisplay,
-          showSetWinnerTitles: false,
-          loading: false
-        }, () => {
-          console.log('✅ State updated. New winnersToDisplay:', this.state.winnersToDisplay.length);
-          console.log('✅ Winners with titles:', this.state.winnersToDisplay.map(w => ({ 
-            name: w.player.name, 
-            title: w.title, 
-            rank: w.rank,
-            selected: w.selected 
-          })));
+      showSetWinnerTitles: false 
     });
 
     // Show success message
-        const finalSkippedCount = totalSelected - selectedWinners.length;
-        const successMessage = finalSkippedCount > 0
-          ? `Successfully saved ${response.data?.winners?.length || selectedWinners.length} winner title(s)!\n\nNote: ${finalSkippedCount} winner(s) were skipped due to invalid or missing customer IDs.`
-          : `Successfully saved ${response.data?.winners?.length || selectedWinners.length} winner title(s)!`;
-        
-        this.showCustomAlert('Winner Titles Saved', successMessage);
-      } else {
-        console.error('❌ API returned success: false', response);
-        throw new Error(response.message || 'Failed to save winner titles');
-      }
-    } catch (error) {
-      console.error('❌ Error saving winner titles:', error);
-      console.error('❌ Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      });
-      const errorMessage = error instanceof Error ? error.message : 'Failed to save winner titles';
-      this.setState({ loading: false });
     this.showCustomAlert(
-        'Error Saving Winner Titles',
-        `Failed to save winner titles: ${errorMessage}\n\nPlease check the console for more details.`
+      'Winner Titles Saved',
+      'Winner titles and rankings have been saved successfully!'
     );
-    }
   };
 
   private deleteLastRound = (): void => {
@@ -4282,69 +2383,49 @@ selectedRoundDisplayName: '',
     this.showDeleteConfirm(
       'Delete Round',
       `Are you sure you want to delete "${roundName}"?\n\nThis action cannot be undone.`,
-      async () => {
-        try {
-          // Call backend API to delete the round if we have IDs
-          const tournamentId = this.state.selectedTournament?.id?.toString?.() || this.state.currentGameMatch?.tournamentId?.toString?.();
-          const roundApiId = lastRound.apiRoundId || lastRound.id;
-          if (tournamentId && roundApiId) {
-            this.setState({ loading: true });
-            await matchesApiService.deleteRound(tournamentId, roundApiId);
-          }
+      () => {
+        // Delete the last round
+        const updatedRounds = this.state.rounds.slice(0, -1);
+        
+        // Remove the deleted round's name from usedRoundNames so it can be used again
+        const deletedRoundName = lastRound.displayName || lastRound.name;
+        const originalRoundName = lastRound.name;
 
-          // Delete the last round locally
-          const updatedRounds = this.state.rounds.slice(0, -1);
-          
-          // Remove the deleted round's name from usedRoundNames so it can be used again
-          const deletedRoundName = lastRound.displayName || lastRound.name;
+        // Remove the custom display name from usedRoundNames
+        let updatedUsedRoundNames = this.state.usedRoundNames.filter(name => 
+          name !== deletedRoundName
+        );
 
-          // Remove the custom display name from usedRoundNames
-          let updatedUsedRoundNames = this.state.usedRoundNames.filter(name => 
-            name !== deletedRoundName
-          );
-
-          // Always add back the standard display name for the round being deleted
-          const standardDisplayNames = {
-            'Round 1': 'First Round',
-            'Round 2': 'Second Round', 
-            'Round 3': 'Third Round',
-            'Round 4': 'Fourth Round',
-            'Round 5': 'Fifth Round',
-            'Round 6': 'Sixth Round',
-            'Round 7': 'Seventh Round',
-            'Round 8': 'Eighth Round',
-            'Round 9': 'Ninth Round',
-            'Round 10': 'Tenth Round'
-          };
-          
-          const standardDisplayName = standardDisplayNames[lastRound.name] || lastRound.name;
-          updatedUsedRoundNames = [...updatedUsedRoundNames, standardDisplayName];
-          
-          // If the deleted round was active, switch to the previous round
-          let newActiveRoundTab = this.state.activeRoundTab;
-          if (this.state.activeRoundTab === lastRound.id) {
-            newActiveRoundTab = updatedRounds.length > 0 ? updatedRounds[updatedRounds.length - 1].id : null;
-          }
-
-          this.setState({
-            rounds: updatedRounds,
-            activeRoundTab: newActiveRoundTab,
-            usedRoundNames: updatedUsedRoundNames,
-            loading: false
-          });
-
-          console.log(`Deleted last round: ${deletedRoundName}. Made round name available for reuse.`);
-          this.showCustomAlert('Round Deleted', `"${deletedRoundName}" deleted successfully.`);
-        } catch (error) {
-          console.error('❌ Failed to delete round via API:', error);
-          this.setState({ loading: false });
-          if (this.isSessionExpiredError(error)) {
-            console.log('🔐 Session expired, redirecting to login...');
-            return;
-          }
-          const errorMessage = error instanceof Error ? error.message : 'Failed to delete round';
-          this.showCustomAlert('Error Deleting Round', errorMessage);
+        // Always add back the standard display name for the round being deleted
+        const standardDisplayNames = {
+          'Round 1': 'First Round',
+          'Round 2': 'Second Round', 
+          'Round 3': 'Third Round',
+          'Round 4': 'Fourth Round',
+          'Round 5': 'Fifth Round',
+          'Round 6': 'Sixth Round',
+          'Round 7': 'Seventh Round',
+          'Round 8': 'Eighth Round',
+          'Round 9': 'Ninth Round',
+          'Round 10': 'Tenth Round'
+        };
+        
+        const standardDisplayName = standardDisplayNames[lastRound.name] || lastRound.name;
+        updatedUsedRoundNames = [...updatedUsedRoundNames, standardDisplayName];
+        
+        // If the deleted round was active, switch to the previous round
+        let newActiveRoundTab = this.state.activeRoundTab;
+        if (this.state.activeRoundTab === lastRound.id) {
+          newActiveRoundTab = updatedRounds.length > 0 ? updatedRounds[updatedRounds.length - 1].id : null;
         }
+  
+        this.setState({
+          rounds: updatedRounds,
+          activeRoundTab: newActiveRoundTab,
+          usedRoundNames: updatedUsedRoundNames
+        });
+  
+        console.log(`Deleted last round: ${deletedRoundName}. Made round name available for reuse.`);
       }
     );
   };
@@ -4414,30 +2495,8 @@ selectedRoundDisplayName: '',
   this.showDeleteConfirm(
     'Close Round',
     `Are you sure you want to close "${roundName}"?\n\nThis action cannot be undone.`,
-    async () => {
-      // Try API delete first (if IDs available)
-      try {
-        const tournamentId = this.state.selectedTournament?.id?.toString?.() || this.state.currentGameMatch?.tournamentId?.toString?.();
-        const roundApiId = round.apiRoundId || round.id;
-        if (tournamentId && roundApiId) {
-          this.setState({ loading: true });
-          await matchesApiService.deleteRound(tournamentId, roundApiId);
-        } else {
-          console.warn('⚠️ Missing tournamentId or roundApiId; skipping API delete', { tournamentId, roundApiId });
-        }
-      } catch (err) {
-        console.error('❌ Delete round API failed:', err);
-        if (this.isSessionExpiredError(err)) {
-          console.log('🔐 Session expired, redirecting to login...');
-          return;
-        }
-        const message = err instanceof Error ? err.message : 'Failed to delete round';
-        this.showCustomAlert('Error Deleting Round', message);
-      } finally {
-        this.setState({ loading: false });
-      }
-
-      // Remove the round locally
+    () => {
+      // Remove the round
       const updatedRounds = this.state.rounds.filter(r => r.id !== roundId);
       
       // Remove the closed round's name from usedRoundNames so it can be used again
@@ -4512,10 +2571,9 @@ selectedRoundDisplayName: '',
   };
 
   // Method to move selected winners to target round
-  private moveSelectedWinnersToRound = async (sourceRoundId: string): Promise<void> => {
+  private moveSelectedWinnersToRound = (sourceRoundId: string): void => {
     if (!this.state.selectedRoundId) {
       console.log('Please select a destination');
-      this.showCustomAlert('No Destination Selected', 'Please select a target round from the dropdown.');
       return;
     }
 
@@ -4523,7 +2581,6 @@ selectedRoundDisplayName: '',
     const sourceRoundIndex = this.state.rounds.findIndex(r => r.id === sourceRoundId);
     if (sourceRoundIndex === -1) {
       console.log('Source round not found');
-      this.showCustomAlert('Error', 'Source round not found. Please refresh and try again.');
       return;
     }
 
@@ -4532,7 +2589,6 @@ selectedRoundDisplayName: '',
     
     if (selectedWinners.length === 0) {
       console.log('No winners selected to move');
-      this.showCustomAlert('No Winners Selected', 'Please select winners to move.');
       return;
     }
 
@@ -4543,7 +2599,6 @@ selectedRoundDisplayName: '',
     const targetRoundIndex = this.state.rounds.findIndex(r => r.id === this.state.selectedRoundId);
     if (targetRoundIndex === -1) {
       console.log('Target round not found');
-      this.showCustomAlert('Error', 'Target round not found. Please refresh and try again.');
       return;
     }
 
@@ -4555,27 +2610,6 @@ selectedRoundDisplayName: '',
         'Cannot Move Winners',
         `Cannot move winners to "${targetRound.displayName || targetRound.name}".\n\nThis round is frozen and no more changes are allowed.`
       );
-      return;
-    }
-    
-    // Get tournament ID for API call
-    const tournamentId = this.state.currentGameMatch?.tournamentId;
-    if (!tournamentId) {
-      this.showCustomAlert('Error', 'Tournament ID not found. Please refresh and try again.');
-      return;
-    }
-
-    // Get API round IDs
-    const sourceRoundApiId = sourceRound.apiRoundId || sourceRound.id;
-    const targetRoundApiId = targetRound.apiRoundId || targetRound.id;
-
-    // Get customerProfileId from selected winners
-    const winnerIds = selectedWinners
-      .map(w => w.customerProfileId)
-      .filter((id): id is string => id !== null && id !== undefined);
-
-    if (winnerIds.length === 0) {
-      this.showCustomAlert('Error', 'No valid player IDs found. Please ensure winners have customer profile IDs.');
       return;
     }
     
@@ -4628,21 +2662,6 @@ selectedRoundDisplayName: '',
       name: w.name,
       history: `Won in: ${w.originalWinnerRoundId || 'Unknown'}, Current: ${w.currentRound || 'Unknown'}`
     })));
-
-    // Show loading state
-    this.setState({ loading: true });
-
-    try {
-      // Step 1: Remove winners from source round (if they're in the players array)
-      // Note: Winners in the winners array don't need to be removed via API
-      // They just need to be moved to the target round
-      
-      // Step 2: Add winners to target round via API
-      console.log('🎯 Moving winners to target round via API');
-      const response = await matchesApiService.movePlayersToRound(tournamentId, targetRoundApiId, winnerIds);
-      
-      if (response.success) {
-        console.log('✅ Winners moved to round via API:', response.data);
 
     // Update the rounds array
     const updatedRounds = this.state.rounds.map((round, index) => {
@@ -4697,55 +2716,16 @@ selectedRoundDisplayName: '',
       return round;
     });
 
-        // Update allPlayers if they exist in the main players list
-        let updatedAllPlayers = this.state.currentGameMatch?.allPlayers;
-        if (updatedAllPlayers) {
-          const selectedWinnerIds = selectedWinners.map(w => w.id);
-          updatedAllPlayers = updatedAllPlayers.map((player: Player) => 
-            selectedWinnerIds.includes(player.id)
-              ? { 
-                  ...player, 
-                  selected: false, 
-                  status: isMovingToPreviousRound ? 'winner' as const : 'available' as const,
-                  currentRound: isMovingToPreviousRound ? targetRound.id : targetRound.id
-                }
-              : player
-          );
-        }
+    this.setState({ 
+      rounds: updatedRounds,
+      selectedRoundId: null // Reset selection
+    });
 
     const destination = isMovingToPreviousRound ? 
       `${this.state.rounds[targetRoundIndex].displayName || this.state.rounds[targetRoundIndex].name} Winners Tab` :
       `${this.state.rounds[targetRoundIndex].displayName || this.state.rounds[targetRoundIndex].name} Players Tab`;
     
-        this.setState({ 
-          currentGameMatch: updatedAllPlayers ? {
-            ...this.state.currentGameMatch,
-            allPlayers: updatedAllPlayers
-          } : this.state.currentGameMatch,
-          rounds: updatedRounds,
-          selectedRoundId: null, // Reset selection
-          loading: false
-        });
-
-        console.log(`✅ Moved ${selectedWinners.length} winners from ${sourceRound.displayName || sourceRound.name} Winners Tab to ${destination}`);
-        
-        // Show success message
-        this.showCustomAlert(
-          'Winners Moved Successfully',
-          `Successfully moved ${response.data.moved || selectedWinners.length} winner(s) to "${targetRound.displayName || targetRound.name}".${response.data.skipped > 0 ? `\n\nNote: ${response.data.skipped} winner(s) were skipped (already in round).` : ''}`
-        );
-      } else {
-        throw new Error(response.message || 'Failed to move winners');
-      }
-    } catch (error) {
-      console.error('❌ Error moving winners to round:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to move winners to round';
-      this.setState({ loading: false });
-      this.showCustomAlert(
-        'Error Moving Winners',
-        `Failed to move winners: ${errorMessage}\n\nPlease try again.`
-      );
-    }
+    console.log(`Moved ${selectedWinners.length} winners from ${sourceRound.displayName || sourceRound.name} Winners Tab to ${destination}`);
   };
 
   private shuffleRoundPlayers = (roundId: string): void => {
@@ -4887,17 +2867,14 @@ selectedRoundDisplayName: '',
     console.log(`Frozen round: ${round.displayName || round.name}. No more changes allowed.`);
   };
 
-  private moveSelectedPlayersFromRound = async (sourceRoundId: string): Promise<void> => {
-    console.log('🖱️ moveSelectedPlayersFromRound called!', {
-      sourceRoundId,
-      selectedRoundId: this.state.selectedRoundId,
-      timestamp: new Date().toISOString()
-    });
+  private moveSelectedPlayersFromRound = (sourceRoundId: string): void => {
+    /*if (!this.state.selectedRoundId) {
+      console.log('Please select a destination');
+      return;
+    }*/
 
     // Default to dashboard if no selection
     const targetRoundId = this.state.selectedRoundId || 'dashboard';
-    
-    console.log('🎯 Target round ID:', targetRoundId);
 
     // Find source round
     const sourceRoundIndex = this.state.rounds.findIndex(r => r.id === sourceRoundId);
@@ -4916,43 +2893,6 @@ selectedRoundDisplayName: '',
 
     // Check if moving to dashboard
     if (targetRoundId === 'dashboard' || targetRoundId === 'dashboard2' || targetRoundId === 'dashboard3') {
-      // Get tournament ID and round ID for API call
-      const tournamentId = this.state.currentGameMatch?.tournamentId;
-      const roundId = sourceRound.apiRoundId || sourceRound.id;
-
-      if (!tournamentId) {
-        this.showCustomAlert(
-          'Error',
-          'Tournament ID not found. Cannot remove players from round.'
-        );
-        return;
-      }
-
-      // Extract customerProfileId from selected players
-      const playerIds = selectedPlayers
-        .map(p => p.customerProfileId)
-        .filter((id): id is string => id !== null && id !== undefined);
-
-      if (playerIds.length === 0) {
-        this.showCustomAlert(
-          'Error',
-          'No valid player IDs found. Cannot remove players from round.'
-        );
-        return;
-      }
-
-      // Show loading state
-      this.setState({ loading: true });
-
-      try {
-        // Call API to remove players from round
-        const response = await matchesApiService.removePlayersFromRound(
-          tournamentId,
-          roundId,
-          playerIds
-        );
-
-        if (response.success) {
       // Check if any selected players are previous round winners
       const previousRoundWinners = selectedPlayers.filter(p => p.isPreviousRoundWinner);
       const regularPlayers = selectedPlayers.filter(p => !p.isPreviousRoundWinner);
@@ -4984,7 +2924,7 @@ selectedRoundDisplayName: '',
         
         // Move regular players back to Tournament Dashboard
         let updatedAllPlayers = this.state.currentGameMatch?.allPlayers || [];
-            if (regularPlayers.length > 0 && this.state.currentGameMatch && this.state.currentGameMatch.allPlayers) {
+        if (regularPlayers.length > 0 && this.state.currentGameMatch) {
           updatedAllPlayers = this.state.currentGameMatch.allPlayers.map((player: Player) => {
             const isMovingPlayer = regularPlayers.some(p => p.id === player.id);
             if (isMovingPlayer) {
@@ -5018,23 +2958,15 @@ selectedRoundDisplayName: '',
         this.setState({ 
           rounds: updatedRounds,
           currentGameMatch: updatedCurrentGameMatch,
-              selectedRoundId: null,
-              loading: false
+          selectedRoundId: null
         });
 
-            console.log(`✅ Removed ${response.data?.removed || selectedPlayers.length} players from round via API`);
         console.log(`Moved ${regularPlayers.length} regular players to dashboard and ${previousRoundWinners.length} previous round winners to their original winners tabs`);
-            
-            // Show success message
-            this.showCustomAlert(
-              'Players Removed Successfully',
-              `Successfully removed ${response.data?.removed || selectedPlayers.length} player(s) from "${sourceRound.displayName || sourceRound.name}".${response.data?.notFound > 0 ? `\n\nNote: ${response.data.notFound} player(s) were not found in the round.` : ''}`
-            );
         return;
       }
       
       // Move regular players back to Tournament Dashboard
-          if (this.state.currentGameMatch && this.state.currentGameMatch.allPlayers) {
+      if (this.state.currentGameMatch) {
         const updatedAllPlayers = this.state.currentGameMatch.allPlayers.map((player: Player) => {
           const isMovingPlayer = selectedPlayers.some(p => p.id === player.id);
           if (isMovingPlayer) {
@@ -5067,36 +2999,13 @@ selectedRoundDisplayName: '',
         this.setState({ 
           rounds: updatedRounds,
           currentGameMatch: updatedCurrentGameMatch,
-              selectedRoundId: null,
-              loading: false
+          selectedRoundId: null
         });
 
-            console.log(`✅ Removed ${response.data?.removed || selectedPlayers.length} players from round via API`);
         console.log(`Moved ${selectedPlayers.length} players from ${sourceRound.displayName || sourceRound.name} back to Tournament Dashboard`);
-            
-            // Show success message
-            this.showCustomAlert(
-              'Players Removed Successfully',
-              `Successfully removed ${response.data?.removed || selectedPlayers.length} player(s) from "${sourceRound.displayName || sourceRound.name}".${response.data?.notFound > 0 ? `\n\nNote: ${response.data.notFound} player(s) were not found in the round.` : ''}`
-            );
-          }
-        } else {
-          throw new Error(response.message || 'Failed to remove players from round');
-        }
-      } catch (error) {
-        console.error('❌ Error removing players from round:', error);
-        const errorMessage = error instanceof Error ? error.message : 'Failed to remove players from round';
-        this.setState({ loading: false });
-        this.showCustomAlert(
-          'Error Removing Players',
-          `Failed to remove players: ${errorMessage}\n\nPlease try again.`
-        );
       }
       return;
     }
-
-    console.log('✅ Not moving to dashboard - moving to another round');
-    console.log('🔍 Target round ID:', targetRoundId);
 
     // Find target round
     const targetRoundIndex = this.state.rounds.findIndex(r => r.id === targetRoundId);
@@ -5136,74 +3045,7 @@ selectedRoundDisplayName: '',
       return;
     }
 
-    // Get tournament ID and round IDs for API calls
-    const tournamentId = this.state.currentGameMatch?.tournamentId;
-    if (!tournamentId) {
-      this.showCustomAlert(
-        'Error',
-        'Tournament ID not found. Cannot move players between rounds.'
-      );
-      return;
-    }
-
-    // Use API round IDs if available (for API calls)
-    const sourceRoundApiId = sourceRound.apiRoundId || sourceRound.id;
-    const targetRoundApiId = targetRound.apiRoundId || targetRound.id;
-
-    // Extract customerProfileId from selected players
-    const playerIds = selectedPlayers
-      .map(p => p.customerProfileId)
-      .filter((id): id is string => id !== null && id !== undefined);
-
-    if (playerIds.length === 0) {
-      this.showCustomAlert(
-        'Error',
-        'No valid player IDs found. Cannot move players between rounds.'
-      );
-      return;
-    }
-
-    console.log('📋 About to call APIs:', {
-      tournamentId,
-      sourceRoundApiId,
-      targetRoundApiId,
-      playerIds,
-      playerCount: playerIds.length
-    });
-
-    // Show loading state
-    this.setState({ loading: true });
-
-    try {
-      // Step 1: Remove players from source round
-      console.log('🔄 Step 1: Calling removePlayersFromRound API...');
-      const removeResponse = await matchesApiService.removePlayersFromRound(
-        tournamentId,
-        sourceRoundApiId,
-        playerIds
-      );
-
-      if (!removeResponse.success) {
-        throw new Error(removeResponse.message || 'Failed to remove players from source round');
-      }
-
-      console.log('✅ Step 1 complete: Players removed from source round');
-
-      // Step 2: Add players to target round
-      console.log('🔄 Step 2: Adding players to target round via API');
-      const addResponse = await matchesApiService.movePlayersToRound(
-        tournamentId,
-        targetRoundApiId,
-        playerIds
-      );
-
-      if (!addResponse.success) {
-        throw new Error(addResponse.message || 'Failed to add players to target round');
-      }
-
-      console.log('✅ Step 2 complete: Players added to target round');
-
-      // Update the rounds array after successful API calls
+    // Update the rounds array
     const updatedRounds = this.state.rounds.map((round, index) => {
       if (index === sourceRoundIndex) {
         // Remove selected players from source round
@@ -5276,104 +3118,12 @@ selectedRoundDisplayName: '',
       return round;
     });
 
-      // Also update currentGameMatch.rounds to keep in sync
-      let updatedCurrentGameMatchRounds = this.state.currentGameMatch?.rounds;
-      if (updatedCurrentGameMatchRounds) {
-        updatedCurrentGameMatchRounds = updatedCurrentGameMatchRounds.map((r, idx) => {
-          if (idx === sourceRoundIndex) {
-            return {
-              ...r,
-              players: r.players.filter(p => !selectedPlayers.some(sp => sp.id === p.id))
-            };
-          } else if (idx === targetRoundIndex) {
-            const previousRoundWinners = selectedPlayers.filter(p => p.isPreviousRoundWinner);
-            const regularPlayers = selectedPlayers.filter(p => !p.isPreviousRoundWinner);
-            
-            let updatedRound = { ...r };
-            
-            if (regularPlayers.length > 0) {
-              updatedRound = {
-                ...updatedRound,
-                players: [
-                  ...r.players,
-                  ...regularPlayers.map(p => ({ ...p, selected: false, currentRound: r.id }))
-                ]
-              };
-            }
-            
-            if (previousRoundWinners.length > 0) {
-              const winnersToAddToWinners = previousRoundWinners.filter(p => p.previousWinningRoundId === r.id);
-              if (winnersToAddToWinners.length > 0) {
-                updatedRound = {
-                  ...updatedRound,
-                  winners: [
-                    ...r.winners,
-                    ...winnersToAddToWinners.map(p => ({ ...p, selected: false }))
-                  ]
-                };
-              }
-              
-              const winnersToAddToPlayers = previousRoundWinners.filter(p => p.previousWinningRoundId !== r.id);
-              if (winnersToAddToPlayers.length > 0) {
-                updatedRound = {
-                  ...updatedRound,
-                  players: [
-                    ...updatedRound.players,
-                    ...winnersToAddToPlayers.map(p => ({ ...p, selected: false, currentRound: r.id }))
-                  ]
-                };
-              }
-            }
-            
-            return updatedRound;
-          }
-          return r;
-        });
-      }
-
-      // Update allPlayers status
-      const selectedPlayerIds = selectedPlayers.map(p => p.id);
-      let updatedAllPlayers = this.state.currentGameMatch?.allPlayers;
-      if (updatedAllPlayers) {
-        updatedAllPlayers = updatedAllPlayers.map((player: Player) => {
-          if (selectedPlayerIds.includes(player.id)) {
-            return {
-              ...player,
-              selected: false,
-              status: 'in_round' as const,
-              currentRound: targetRound.id // Use local round ID for currentRound
-            };
-          }
-          return player;
-        });
-      }
-
     this.setState({ 
       rounds: updatedRounds,
-        currentGameMatch: {
-          ...this.state.currentGameMatch,
-          rounds: updatedCurrentGameMatchRounds,
-          allPlayers: updatedAllPlayers
-        },
-        selectedRoundId: null, // Reset selection
-        loading: false
-      });
+      selectedRoundId: null // Reset selection
+    });
 
-      console.log(`✅ Moved ${selectedPlayers.length} players from ${sourceRound.displayName || sourceRound.name} to ${this.state.rounds[targetRoundIndex].displayName || this.state.rounds[targetRoundIndex].name} via API`);
-      
-      this.showCustomAlert(
-        'Players Moved Successfully',
-        `Successfully moved ${selectedPlayers.length} player(s) from "${sourceRound.displayName || sourceRound.name}" to "${this.state.rounds[targetRoundIndex].displayName || this.state.rounds[targetRoundIndex].name}".`
-      );
-    } catch (error) {
-      console.error('❌ Error moving players between rounds:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to move players between rounds';
-      this.setState({ loading: false });
-      this.showCustomAlert(
-        'Error Moving Players',
-        `Failed to move players: ${errorMessage}\n\nPlease try again.`
-      );
-    }
+    console.log(`Moved ${selectedPlayers.length} players from ${sourceRound.displayName || sourceRound.name} to ${this.state.rounds[targetRoundIndex].displayName || this.state.rounds[targetRoundIndex].name}`);
   };
 
   private moveSelectedPlayersToRound = (): void => {
@@ -5457,7 +3207,7 @@ selectedRoundDisplayName: '',
         name: player.name,
         email: player.email,
         skill: player.skillLevel || 'Beginner',
-        profilePic: getAvatar(player.profilePic),
+        profilePic: player.profilePic || '/default-avatar.png',
         selected: false,
         status: 'available' as const,
         currentRound: null,
@@ -5798,37 +3548,17 @@ selectedRoundDisplayName: '',
         // Create the round locally with the data from API
         const newRound = this.createNewRound(roundDisplayName);
         
-        // Store the API round ID from the response
-        if (response.data && response.data.round && response.data.round.id) {
-          newRound.apiRoundId = response.data.round.id;
-          newRound.roundNumber = response.data.round.roundNumber;
-          newRound.status = (response.data.round.status as 'pending' | 'active' | 'completed') || 'pending';
-          console.log('💾 Stored API round ID:', newRound.apiRoundId);
-        } else {
-          console.warn('⚠️ API response missing round data:', response.data);
-        }
-        
-        // Update state with the new round - update both rounds array and currentGameMatch.rounds
-        const updatedRounds = [...this.state.rounds, newRound];
-        const updatedCurrentGameMatch = this.state.currentGameMatch ? {
-          ...this.state.currentGameMatch,
-          rounds: [...(this.state.currentGameMatch.rounds || []), newRound]
-        } : this.state.currentGameMatch;
-        
+        // Update state with the new round
         this.setState({
-          rounds: updatedRounds,
-          currentGameMatch: updatedCurrentGameMatch,
+          rounds: [...this.state.rounds, newRound],
           activeRoundTab: newRound.id, // Set the new round as active
-          activeRoundSubTab: { ...this.state.activeRoundSubTab, [newRound.id]: 'players' }, // Initialize sub-tab to 'players'
+          activeRoundSubTab: { ...this.state.activeRoundSubTab, [newRound.id]: 'matches' }, // Initialize sub-tab to 'matches'
           showRoundNameModal: false,
           selectedRoundDisplayName: '',
           usedRoundNames: [...this.state.usedRoundNames, roundDisplayName] // Add to used names
         });
         
-        this.showCustomAlert(
-          'Round Created Successfully',
-          `Round "${roundDisplayName}" has been created successfully.`
-        );
+        alert('Round created successfully!');
       } else {
         throw new Error(response.message || 'Failed to create round');
       }
@@ -6084,9 +3814,9 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
     }
 
     return (
-        <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)', color: '#ffffff' }}>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 w-full">
         {/* Header */}
-        <div className="bg-white/5 backdrop-blur-lg border-b border-white/10 shadow-lg">
+        <div className="bg-white shadow-lg border-b border-gray-200">
           <div className="max-w-7xl mx-auto px-6 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -6094,17 +3824,17 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                   <Trophy className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-white">Organizer Portal</h1>
-                  <p className="text-sm text-white/70">Billiards Tournament Management</p>
+                  <h1 className="text-2xl font-bold text-gray-900">Organizer Portal</h1>
+                  <p className="text-sm text-gray-600">Billiards Tournament Management</p>
                 </div>
               </div>
               <div className="flex items-center gap-3">
                 <div className="text-right">
-                  <div className="text-sm font-medium text-white">John Organizer</div>
-                  <div className="text-xs text-white/70">Tournament Director</div>
+                  <div className="text-sm font-medium text-gray-900">John Organizer</div>
+                  <div className="text-xs text-gray-500">Tournament Director</div>
                 </div>
-                <div className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center border border-white/20">
-                  <User className="w-4 h-4 text-white" />
+                <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-gray-600" />
                 </div>
               </div>
             </div>
@@ -6114,53 +3844,53 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
         <div className="max-w-7xl mx-auto px-6 py-8">
           {/* Navigation Tabs */}
           <div className="mb-8">
-            <div className="flex space-x-1 bg-white/5 backdrop-blur-lg rounded-lg p-1 border border-white/10">
+            <div className="flex space-x-1 bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => this.setState({ activeTab: 'schedule' })}
-                className={`px-6 py-3 rounded-md text-sm font-medium transition-all ${
+                className={`px-6 py-3 rounded-md text-sm font-medium transition-colors ${
                   this.state.activeTab === 'schedule'
-                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 Schedule Tournament
               </button>
               <button
                 onClick={this.handleScheduledMatchesClick}
-                className={`px-6 py-3 rounded-md text-sm font-medium transition-all ${
+                className={`px-6 py-3 rounded-md text-sm font-medium transition-colors ${
                   this.state.activeTab === 'scheduled'
-                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 Scheduled Tournaments
               </button>
               <button
                 onClick={() => this.setState({ activeTab: 'previous' })}
-                className={`px-6 py-3 rounded-md text-sm font-medium transition-all ${
+                className={`px-6 py-3 rounded-md text-sm font-medium transition-colors ${
                   this.state.activeTab === 'previous'
-                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
-                Previous Tournaments
+                Previous Matches
               </button>
               <button
                 onClick={() => this.setState({ activeTab: 'notifications' })}
-                className={`px-6 py-3 rounded-md text-sm font-medium transition-all ${
+                className={`px-6 py-3 rounded-md text-sm font-medium transition-colors ${
                   this.state.activeTab === 'notifications'
-                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 Notifications
               </button>
               <button
                 onClick={() => this.setState({ activeTab: 'settings' })}
-                className={`px-6 py-3 rounded-md text-sm font-medium transition-all ${
+                className={`px-6 py-3 rounded-md text-sm font-medium transition-colors ${
                   this.state.activeTab === 'settings'
-                    ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg'
-                    : 'text-white/80 hover:text-white hover:bg-white/10'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
                 }`}
               >
                 Settings
@@ -6179,14 +3909,14 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     <div className="w-16 h-16 bg-gradient-to-r from-blue-100 to-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
                       <Plus className="w-8 h-8 text-blue-600" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Create New Tournament</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Create New Match</h2>
                     <p className="text-gray-600 mb-6">Schedule a new billiards tournament with custom rules and settings</p>
                     <button
                       onClick={() => this.setState({ isCreatingMatch: true })}
                       className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center gap-2 mx-auto"
                     >
                       <Plus className="w-5 h-5" />
-                      Schedule New Tournament
+                      Schedule New Match
                     </button>
                   </div>
                 </div>
@@ -6196,7 +3926,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     <div className="flex items-center justify-between">
                       <div>
                         <h2 className="text-2xl font-bold text-white">
-                          {this.state.isEditMode ? 'Edit Tournament Setup' : 'New Tournament Setup'}
+                          {this.state.isEditMode ? 'Edit Match Setup' : 'New Match Setup'}
                         </h2>
                         <p className="text-blue-100 mt-1">
                           {this.state.isEditMode ? 'Update your tournament details' : 'Configure your tournament details'}
@@ -6227,7 +3957,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Tournament Name *
+                            Match Name *
                           </label>
                           <input
                             type="text"
@@ -6277,95 +4007,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           </div>
                         </div>
                       )}
-
-                      {/* Tournament Date and Time */}
-                      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Tournament Date *
-                          </label>
-                          <input
-                            type="date"
-                            required
-                            value={this.state.matchForm.tournamentDate || ''}
-                            onChange={(e) => this.handleInputChange('tournamentDate', e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Tournament Time *
-                          </label>
-                          <input
-                            type="time"
-                            required
-                            value={this.state.matchForm.tournamentTime || ''}
-                            onChange={(e) => this.handleInputChange('tournamentTime', e.target.value)}
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Max Players, Entry Fee, Prize Pool */}
-                      <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Max Players *
-                          </label>
-                          <input
-                            type="number"
-                            required
-                            min="1"
-                            value={this.state.matchForm.maxPlayers}
-                            onChange={(e) => this.handleInputChange('maxPlayers', e.target.value)}
-                            placeholder="e.g., 50"
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Entry Fee *
-                          </label>
-                          <input
-                            type="number"
-                            required
-                            min="0"
-                            step="0.01"
-                            value={this.state.matchForm.entryFee}
-                            onChange={(e) => this.handleInputChange('entryFee', e.target.value)}
-                            placeholder="e.g., 750.00"
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Prize Pool *
-                          </label>
-                          <input
-                            type="number"
-                            required
-                            min="0"
-                            step="0.01"
-                            value={this.state.matchForm.prizePool || ''}
-                            onChange={(e) => this.handleInputChange('prizePool', e.target.value)}
-                            placeholder="e.g., 10000.00"
-                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          />
-                        </div>
-                      </div>
-
-                      {/* Registration Deadline */}
-                      <div className="mt-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Registration Deadline
-                        </label>
-                        <input
-                          type="datetime-local"
-                          value={this.state.matchForm.registrationDeadline || ''}
-                          onChange={(e) => this.handleInputChange('registrationDeadline', e.target.value)}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </div>
                     </div>
 
                     {/* Game Configuration */}
@@ -6707,7 +4348,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-8 py-3 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all duration-200 flex items-center gap-2"
                         >
                           <Save className="w-5 h-5" />
-                          {this.state.isEditMode ? 'Update Tournament' : 'Schedule Tournament'}
+                          {this.state.isEditMode ? 'Update Match' : 'Schedule Match'}
                         </button>
                       </div>
                     </div>
@@ -6722,12 +4363,12 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
             <div className="space-y-6">
               {/* Loading State */}
               {this.state.loading && (
-                <div className="bg-white/5 backdrop-blur-lg rounded-2xl shadow-lg p-6 border border-white/10">
+                <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
                   <div className="flex items-center justify-center py-12">
                     <div className="text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                      <p className="text-white font-medium">Loading tournaments...</p>
-                      <p className="text-sm text-white/70 mt-2">Please wait while we fetch your tournaments</p>
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                      <p className="text-gray-600 font-medium">Loading tournaments...</p>
+                      <p className="text-sm text-gray-500 mt-2">Please wait while we fetch your tournaments</p>
                     </div>
                   </div>
                 </div>
@@ -6735,14 +4376,14 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
               
               {/* Error State */}
               {!this.state.loading && this.state.error && (
-                <div className="bg-white/5 backdrop-blur-lg rounded-2xl shadow-lg p-6 border border-white/10">
+                <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
                   <div className="text-center py-12">
-                    <div className="text-red-400 text-5xl mb-4">⚠️</div>
-                    <h3 className="text-lg font-semibold text-white mb-2">Error Loading Tournaments</h3>
-                    <p className="text-white/80 mb-6 max-w-md mx-auto">{this.state.error}</p>
+                    <div className="text-red-500 text-5xl mb-4">⚠️</div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Tournaments</h3>
+                    <p className="text-gray-600 mb-6 max-w-md mx-auto">{this.state.error}</p>
                     <button
                       onClick={this.handleScheduledMatchesClick}
-                      className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-medium shadow-lg"
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
                     >
                       Retry
                     </button>
@@ -6752,17 +4393,17 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
               
               {/* Content - Only show when not loading and no error */}
               {!this.state.loading && !this.state.error && (
-              <div className="bg-white/5 backdrop-blur-lg rounded-2xl shadow-lg p-6 border border-white/10">
+              <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-white">Scheduled Tournaments</h2>
+                  <h2 className="text-xl font-bold text-gray-900">Scheduled Tournaments</h2>
                   <div className="flex items-center gap-4">
                     <button
                       onClick={() => this.testCustomerRegistrationsAPI()}
-                      className="px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-700 hover:to-emerald-700 transition-all text-sm shadow-lg"
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
                     >
                       Test API
                     </button>
-                    <div className="flex items-center gap-2 text-sm text-white/70">
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
                       <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
                       Step 1 of 2
                     </div>
@@ -6772,12 +4413,12 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                   {/* Empty State */}
                   {this.state.apiTournaments.length === 0 ? (
                     <div className="text-center py-12">
-                      <div className="text-white/40 text-5xl mb-4">🏆</div>
-                      <h3 className="text-lg font-semibold text-white mb-2">No Scheduled Tournaments</h3>
-                      <p className="text-white/70 mb-6">You don't have any scheduled tournaments yet.</p>
+                      <div className="text-gray-400 text-5xl mb-4">🏆</div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No Scheduled Tournaments</h3>
+                      <p className="text-gray-600 mb-6">You don't have any scheduled tournaments yet.</p>
                       <button
                         onClick={() => this.setState({ activeTab: 'schedule' })}
-                        className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all font-medium shadow-lg"
+                        className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-medium"
                       >
                         Schedule a Tournament
                       </button>
@@ -6793,22 +4434,22 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     console.log('🎨 Tournament ID:', tournament.tournamentId);
                     
                     return (
-                    <div key={`api-${tournament.tournamentId}`} className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-lg p-6 hover:bg-white/10 hover:border-white/20 transition-all cursor-pointer" onClick={() => this.handleTournamentClick(tournament.tournamentId, tournament.tournamentName, tournament.organizerId, tournament.venueId, tournament.status)}>
+                    <div key={`api-${tournament.tournamentId}`} className="border border-gray-200 rounded-lg p-6 hover:bg-gray-50 transition-colors cursor-pointer" onClick={() => this.handleTournamentClick(tournament.tournamentId, tournament.tournamentName, tournament.organizerId, tournament.venueId, tournament.status)}>
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-lg font-semibold text-white">{tournament.tournamentName}</h3>
-                            <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                            <h3 className="text-lg font-semibold text-gray-900">{tournament.tournamentName}</h3>
+                            <span className={`px-3 py-1 text-sm font-medium rounded-full border ${
                               tournament.status === 'started' || tournament.status === 'running' || tournament.status === 'ongoing' 
-                                ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white'
+                                ? 'border-green-200 bg-green-50 text-green-700'
                                 : tournament.status === 'completed'
-                                ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white'
-                                : 'bg-gradient-to-r from-orange-500 to-amber-500 text-white'
+                                ? 'border-blue-200 bg-blue-50 text-blue-700'
+                                : 'border-orange-200 bg-orange-50 text-orange-700'
                             }`}>
                               {tournament.status ? tournament.status.charAt(0).toUpperCase() + tournament.status.slice(1).replace('_', ' ') : 'Scheduled'}
                             </span>
                           </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-white/80">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-gray-600">
                             <div className="flex items-center gap-2">
                               <Target className="w-4 h-4" />
                               8-ball
@@ -6828,60 +4469,41 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-lg font-bold text-green-400">$50</div>
-                          <div className="text-sm text-white/70">Entry Fee</div>
+                          <div className="text-lg font-bold text-green-600">$50</div>
+                          <div className="text-sm text-gray-500">Entry Fee</div>
                         </div>
                       </div>
 
                       {/* Action Buttons */}
-                      <div className="flex items-center gap-3 pt-4 border-t border-white/10">
+                      <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            this.handleEditMatch(tournament.tournamentId);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 text-blue-300 rounded-lg hover:bg-blue-500/30 border border-blue-500/30 transition-all text-sm font-medium"
+                          onClick={() => this.handleEditMatch(tournament.tournamentId)}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
                         >
                           <Settings className="w-4 h-4" />
                           Edit Match
                         </button>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            this.handleSendNotification(tournament.tournamentId, tournament.tournamentName);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-green-500/20 text-green-300 rounded-lg hover:bg-green-500/30 border border-green-500/30 transition-all text-sm font-medium"
+                          onClick={() => this.handleSendNotification(tournament.tournamentId, tournament.tournamentName)}
+                          className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium"
                         >
                           <Bell className="w-4 h-4" />
                           Send Notification
                         </button>
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            this.handleShowNotifiedUsers(tournament.tournamentId, tournament.tournamentName);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-orange-500/20 text-orange-300 rounded-lg hover:bg-orange-500/30 border border-orange-500/30 transition-all text-sm font-medium"
+                          onClick={() => this.handleShowNotifiedUsers(tournament.tournamentId, tournament.tournamentName)}
+                          className="flex items-center gap-2 px-4 py-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors text-sm font-medium"
                         >
                           <Bell className="w-4 h-4" />
                           Notified Users (0)
                         </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            this.handleDeleteTournament(tournament.tournamentId, tournament.tournamentName);
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 border border-red-500/30 transition-all text-sm font-medium"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          Delete
-                        </button>
                       </div>
 
                       {/* Registered Players Section - Empty for API tournaments */}
-                      <div className="mt-6 pt-6 border-t border-white/10">
-                        <h4 className="text-sm font-medium text-white/90 mb-4">Registered Players (0)</h4>
-                        <div className="text-center py-8 text-white/60">
-                          <Users className="w-12 h-12 mx-auto mb-3 text-white/30" />
+                      <div className="mt-6 pt-6 border-t border-gray-100">
+                        <h4 className="text-sm font-medium text-gray-700 mb-4">Registered Players (0)</h4>
+                        <div className="text-center py-8 text-gray-500">
+                          <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                           <p className="text-sm">No players registered yet</p>
                         </div>
                       </div>
@@ -6968,17 +4590,16 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                 <div className="flex items-center gap-3 mb-2">
                                   <div className="relative">
                                     <img
-                                      src={getAvatar(player.profilePic)}
-                                      alt={this.getPlayerDisplayName(player)}
+                                      src={player.profilePic}
+                                      alt={player.name}
                                       className="w-10 h-10 rounded-full object-cover border-2 border-blue-400"
-                                      onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                                     />
                                     <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
                                       {player.id}
                                     </div>
                                   </div>
                                   <div className="flex-1">
-                                    <div className="font-medium text-gray-900">{this.getPlayerDisplayName(player)}</div>
+                                    <div className="font-medium text-gray-900">{player.name}</div>
                                     <div className="text-sm text-gray-600">{player.email}</div>
                                   </div>
                                 </div>
@@ -7133,12 +4754,11 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           </div>
                           <div className="text-center">
                             <img
-                              src={getAvatar(player.profilePic)}
-                              alt={this.getPlayerDisplayName(player)}
+                              src={player.profilePic}
+                              alt={player.name}
                               className="w-12 h-12 rounded-full object-cover border-2 border-gray-300 mx-auto mb-2 group-hover:border-blue-400 transition-colors"
-                              onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                             />
-                            <div className="font-medium text-gray-900 text-sm truncate mb-1">{this.getPlayerDisplayName(player)}</div>
+                            <div className="font-medium text-gray-900 text-sm truncate mb-1">{player.name}</div>
                             <div className="text-xs text-gray-500 truncate mb-2">{player.email}</div>
                             <span className={`text-xs px-2 py-1 rounded font-medium ${
                               player.skill === 'Pro' ? 'bg-purple-100 text-purple-800' :
@@ -7219,18 +4839,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           Tournament Results
                         </button>
                       )}
-
-                      {/* Close Tournament Button */}
-                      <button
-                        onClick={this.handleCloseTournament}
-                        className="w-full mb-3 bg-orange-600 text-white px-4 py-3 rounded-lg hover:bg-orange-700 transition-colors font-medium flex items-center justify-center gap-2"
-                        title="Close/End the tournament"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                        Close Tournament
-                      </button>
 
    {/* Round Selection with Stats */}
     <div className="bg-white p-4 rounded-lg mb-4 border border-gray-200">
@@ -7397,7 +5005,1701 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                 </div>
               </div>
 
-          
+            {/* Rounds Section with Horizontal Tabs */}
+            {(this.state.currentGameMatch.rounds?.length || 0) > 0 && (
+              <div className="space-y-6">
+                 {/* Round Tabs Navigation */}
+                 <div className="flex items-center justify-between">
+                    <h3 className="text-2xl font-bold text-gray-900">Tournament Rounds</h3>
+                   
+
+
+                    <div className="flex space-x-2 overflow-x-auto">
+  {this.state.currentGameMatch.rounds?.map((round: TournamentRound, index: number) => {
+    const currentRounds = this.state.currentGameMatch.rounds || [];
+    const isLastRound = currentRounds[currentRounds.length - 1]?.id === round.id;
+    const hasPlayers = round.players.length > 0;
+    const hasWinners = round.winners.length > 0;
+    const hasLosers = round.losers.length > 0;
+    const hasCompletedMatches = round.matches && 
+      round.matches.length > 0 && 
+      round.matches.some(match => match.status === 'completed');
+    const isEmpty = !hasPlayers && !hasWinners && !hasLosers && !hasCompletedMatches;
+    
+    return (
+      <div key={round.id} className="flex items-center space-x-1">
+        <button
+          onClick={() => this.setState({ activeRoundTab: round.id })}
+          className={`px-4 py-3 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${
+            this.state.activeRoundTab === round.id
+              ? 'bg-blue-600 text-white shadow-lg'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+          }`}
+        >
+          <div className="text-center">
+            <div className="font-semibold">{round.name}</div>
+            <div className={`text-xs opacity-75 flex items-center gap-1 ${
+              round.players.length > 0 && round.players.length % 2 !== 0 ? 'text-red-600' : ''
+            }`}>
+              {round.players.length} players
+              {round.players.length > 0 && round.players.length % 2 !== 0 && (
+                <span>⚠️</span>
+              )}
+            </div>
+          </div>
+        </button>
+        
+        {/* Close Button for Empty Rounds */}
+        {isEmpty && isLastRound && (
+          <button
+            onClick={() => this.handleCloseRound(round.id)}
+            className="px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 transition-colors"
+            title="Close this empty round"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+    );
+  })}
+</div>
+</div>
+
+{/* Round Content */}
+{console.log('activeRoundTab', this.state.activeRoundTab)}
+{console.log('currentGameMatch.rounds', this.state.currentGameMatch.rounds)}
+{ this.state.currentGameMatch.rounds?.map((round: TournamentRound, index: number) => (
+  console.log('round', round.id),
+  this.state.activeRoundTab === round.id && (
+    <div key={round.id} className="bg-white rounded-2xl shadow-lg border border-gray-100">
+      {/* Round Header */}
+      <div className="p-6 border-b border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="text-xl font-bold text-gray-900">{round.name}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{round.players.length} players</p>
+                          </div>
+                          <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            round.status === 'active' ? 'bg-green-100 text-green-800' :
+                            round.status === 'completed' ? 'bg-blue-100 text-blue-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {round.status}
+                          </div>
+                        </div>
+                      </div>
+      
+      {/* Players Section */}
+      <div className="p-6">                          
+                        <div className="mb-6">
+                          <h5 className="text-lg font-semibold text-gray-900">{round.name}</h5>
+                        </div>
+                          
+        {/* Round Sub-Tabs */}
+        {this.state.activeRoundTab === round.id && (
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
+            {/* Sub-Tab Navigation */}
+            <div className="flex border-b border-gray-200">
+                              <button
+                                onClick={() => this.setState({
+                                  activeRoundSubTab: {
+                                    ...this.state.activeRoundSubTab,
+                                    [round.id]: 'matches'
+                                  }
+                                })}
+                                className={`flex-1 py-4 px-6 text-center font-medium transition-colors ${
+                                  (this.state.activeRoundSubTab[round.id] || 'matches') === 'matches'
+                                    ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                }`}
+                              >
+                                Matches ({round.matches?.length || 0})
+                              </button>
+                              <button
+                                onClick={() => this.setState({
+                                  activeRoundSubTab: {
+                                    ...this.state.activeRoundSubTab,
+                                    [round.id]: 'waiting'
+                                  }
+                                })}
+                                className={`flex-1 py-4 px-6 text-center font-medium transition-colors ${
+                                  this.state.activeRoundSubTab[round.id] === 'waiting'
+                                    ? 'text-orange-600 border-b-2 border-orange-600 bg-orange-50'
+                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                }`}
+                              >
+                                Waiting Area ({round.players?.filter(p => p.status === 'waiting').length || 0})
+                              </button>
+                              <button
+                                onClick={() => this.setState({
+                                  activeRoundSubTab: {
+                                    ...this.state.activeRoundSubTab,
+                                    [round.id]: 'winners'
+                                  }
+                                })}
+                                className={`flex-1 py-4 px-6 text-center font-medium transition-colors ${
+                                  this.state.activeRoundSubTab[round.id] === 'winners'
+                                    ? 'text-green-600 border-b-2 border-green-600 bg-green-50'
+                                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                }`}
+                              >
+                                Winners ({round.players?.filter(p => p.status === 'winner').length || 0})
+                              </button>
+                            </div>
+
+            {/* Sub-Tab Content */}
+            <div className="p-6">
+              {/* Matches Tab */}
+              {(this.state.activeRoundSubTab[round.id] || 'matches') === 'matches' && (
+                <div>
+                  {/* Match Control Buttons */}
+                  <div className="flex gap-3 mb-6">
+                                    {/* Shuffle Players Button - Show when there are pending matches or unmatched players */}
+                                    {(() => {
+                                      const unmatchedPlayers = round.players.filter(p => p.status === 'in_round' && !round.matches.some(m => m.player1.id === p.id || m.player2.id === p.id));
+                                      const hasUnmatchedPlayers = unmatchedPlayers.length > 0;
+                                      const roundIsPending = round.status === 'pending';
+                                      const hasPendingMatches = round.matches.some(m => m.status === 'pending' || m.status === 'active');
+                                      const shouldShow = hasUnmatchedPlayers || roundIsPending || hasPendingMatches;
+                                      
+                                      // Debug logging
+                                      console.log('🔍 Shuffle Button Debug:', {
+                                        roundId: round.id,
+                                        roundStatus: round.status,
+                                        totalPlayers: round.players.length,
+                                        totalMatches: round.matches.length,
+                                        completedMatches: round.matches.filter(m => m.status === 'completed').length,
+                                        pendingMatches: round.matches.filter(m => m.status === 'pending' || m.status === 'active').length,
+                                        unmatchedPlayers: unmatchedPlayers.map(p => ({ name: p.name, status: p.status })),
+                                        hasUnmatchedPlayers,
+                                        roundIsPending,
+                                        hasPendingMatches,
+                                        shouldShow
+                                      });
+                                      
+                                      return shouldShow;
+                                    })() && (
+                                      <button
+                                        onClick={() => {
+                                          // Get selected and non-selected players (exclude players from completed matches)
+                                          const playersInCompletedMatches = new Set();
+                                          round.matches.filter(m => m.status === 'completed').forEach(match => {
+                                            playersInCompletedMatches.add(match.player1.id);
+                                            playersInCompletedMatches.add(match.player2.id);
+                                          });
+                                          
+                                          const availablePlayers = round.players.filter(p => !playersInCompletedMatches.has(p.id));
+                                          const selectedPlayers = availablePlayers.filter(p => p.selected);
+                                          const remainingPlayers = availablePlayers.filter(p => !p.selected);
+                                          
+                                          if (remainingPlayers.length < 2) {
+                                            alert('Need at least 2 non-selected players to create matches');
+                                            return;
+                                          }
+                                          
+                                          // Shuffle only the remaining (non-selected) players
+                                          const shuffledPlayers = [...remainingPlayers].sort(() => Math.random() - 0.5);
+                                          const matches: TournamentMatch[] = [];
+                                          
+                                          // Create matches in pairs from shuffled players
+                                          const matchedPlayers: Player[] = [];
+                                          for (let i = 0; i < shuffledPlayers.length; i += 2) {
+                                            if (i + 1 < shuffledPlayers.length) {
+                                              matches.push({
+                                                id: `match-${round.id}-${i/2 + 1}`,
+                                                player1: shuffledPlayers[i],
+                                                player2: shuffledPlayers[i + 1],
+                                                status: 'pending'
+                                              });
+                                              matchedPlayers.push(shuffledPlayers[i], shuffledPlayers[i + 1]);
+                                            }
+                                          }
+                                          
+                                          // Find unmatched players (extra players who didn't get matched)
+                                          const unmatchedPlayers = shuffledPlayers.filter(p => !matchedPlayers.some(mp => mp.id === p.id));
+                                          
+                                          // Move selected players to waiting area and update their status
+                                          const playersToWaiting = selectedPlayers.map(p => ({ ...p, status: 'waiting' as const, selected: false }));
+                                          
+                                          // Keep unmatched players in round (status: 'in_round') for manual management
+                                          const unmatchedInRound = unmatchedPlayers.map(p => ({ ...p, status: 'in_round' as const, selected: false }));
+                                          
+                                          // Preserve existing completed matches and add new matches
+                                          const existingMatches = round.matches.filter(m => m.status === 'completed');
+                                          const newMatches = matches;
+                                          const allMatches = [...existingMatches, ...newMatches];
+                                          
+                                          // Update the round: keep matched and unmatched players in round, move selected players to waiting, preserve completed matches
+                                          const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                            r.id === round.id 
+                                              ? { 
+                                                  ...r, 
+                                                  players: [...matchedPlayers, ...unmatchedInRound, ...playersToWaiting], 
+                                                  matches: allMatches 
+                                                }
+                                              : r
+                                          );
+                                          
+                                          // Update all players status
+                                          const updatedAllPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => {
+                                            const selectedPlayer = selectedPlayers.find(sp => sp.id === p.id);
+                                            if (selectedPlayer) {
+                                              return { ...p, status: 'waiting' as const, selected: false };
+                                            }
+                                            return p;
+                                          });
+                                          
+                                          this.setState({
+                                            currentGameMatch: {
+                                              ...this.state.currentGameMatch!,
+                                              allPlayers: updatedAllPlayers,
+                                              rounds: updatedRounds
+                                            },
+                                            showBracketForRound: round.id
+                                          });
+                                          
+                                          console.log('🎲 Shuffled', matchedPlayers.length, 'players into', matches.length, 'new matches, preserved', existingMatches.length, 'completed matches, moved', selectedPlayers.length, 'to waiting area,', unmatchedPlayers.length, 'unmatched players remain');
+                                        }}
+                                        disabled={round.players.length < 2}
+                                        className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        Shuffle Players
+                                      </button>
+                                    )}
+                                    
+                                    {/* Reshuffle All Players Button - Show when there are pending matches or unmatched players */}
+                                    {(() => {
+                                      const unmatchedPlayers = round.players.filter(p => p.status === 'in_round' && !round.matches.some(m => m.player1.id === p.id || m.player2.id === p.id));
+                                      const hasUnmatchedPlayers = unmatchedPlayers.length > 0;
+                                      const roundIsPending = round.status === 'pending';
+                                      const hasPendingMatches = round.matches.some(m => m.status === 'pending' || m.status === 'active');
+                                      return hasUnmatchedPlayers || roundIsPending || hasPendingMatches;
+                                    })() && (
+                                      <button
+                                      onClick={() => {
+                                        // Get all players in round (excluding waiting players and players from completed matches)
+                                        const playersInCompletedMatches = new Set();
+                                        round.matches.filter(m => m.status === 'completed').forEach(match => {
+                                          playersInCompletedMatches.add(match.player1.id);
+                                          playersInCompletedMatches.add(match.player2.id);
+                                        });
+                                        
+                                        const playersInRound = round.players.filter(p => p.status === 'in_round' && !playersInCompletedMatches.has(p.id));
+                                        
+                                        if (playersInRound.length < 2) {
+                                          alert('Need at least 2 players in round to reshuffle');
+                                          return;
+                                        }
+                                        
+                                        // Confirm reshuffle action
+                                        const confirmed = window.confirm(
+                                          `Are you sure you want to reshuffle ALL ${playersInRound.length} players in this round? This will break all existing matches and create new random pairings.`
+                                        );
+                                        
+                                        if (!confirmed) return;
+                                        
+                                        // Shuffle ALL players in round
+                                        const shuffledPlayers = [...playersInRound].sort(() => Math.random() - 0.5);
+                                        const matches: TournamentMatch[] = [];
+                                        
+                                        // Create matches in pairs from shuffled players
+                                        const matchedPlayers: Player[] = [];
+                                        for (let i = 0; i < shuffledPlayers.length; i += 2) {
+                                          if (i + 1 < shuffledPlayers.length) {
+                                            matches.push({
+                                              id: `match-${round.id}-${Date.now()}-${i/2 + 1}`, // Use timestamp to ensure unique IDs
+                                              player1: shuffledPlayers[i],
+                                              player2: shuffledPlayers[i + 1],
+                                              status: 'pending'
+                                            });
+                                            matchedPlayers.push(shuffledPlayers[i], shuffledPlayers[i + 1]);
+                                          }
+                                        }
+                                        
+                                        // Find unmatched players (extra players who didn't get matched)
+                                        const unmatchedPlayers = shuffledPlayers.filter(p => !matchedPlayers.some(mp => mp.id === p.id));
+                                        
+                                        // Keep unmatched players in round (status: 'in_round') for manual management
+                                        const unmatchedInRound = unmatchedPlayers.map(p => ({ ...p, status: 'in_round' as const, selected: false }));
+                                        
+                                        // Keep waiting players as they are
+                                        const waitingPlayers = round.players.filter(p => p.status === 'waiting');
+                                        
+                                        // Preserve existing completed matches and add new matches
+                                        const existingMatches = round.matches.filter(m => m.status === 'completed');
+                                        const newMatches = matches;
+                                        const allMatches = [...existingMatches, ...newMatches];
+                                        
+                                        // Update the round: preserve completed matches, keep waiting players, add matched and unmatched players
+                                        const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                          r.id === round.id 
+                                            ? { 
+                                                ...r, 
+                                                players: [...matchedPlayers, ...unmatchedInRound, ...waitingPlayers], 
+                                                matches: allMatches 
+                                              }
+                                            : r
+                                        );
+                                        
+                                        // Update all players status (reset selection)
+                                        const updatedAllPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => {
+                                          const playerInRound = playersInRound.find(pr => pr.id === p.id);
+                                          if (playerInRound) {
+                                            return { ...p, selected: false }; // Reset selection for all reshuffled players
+                                          }
+                                          return p;
+                                        });
+                                        
+                                        this.setState({
+                                          currentGameMatch: {
+                                            ...this.state.currentGameMatch!,
+                                            allPlayers: updatedAllPlayers,
+                                            rounds: updatedRounds
+                                          },
+                                          showBracketForRound: round.id
+                                        });
+                                        
+                                        console.log('🔄 RESHUFFLED ALL', playersInRound.length, 'players into', matches.length, 'new matches, preserved', existingMatches.length, 'completed matches,', unmatchedPlayers.length, 'unmatched players remain');
+                                      }}
+                                      disabled={round.players.filter(p => p.status === 'in_round').length < 2}
+                                      className="bg-gradient-to-r from-red-500 to-orange-600 hover:from-red-600 hover:to-orange-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                      </svg>
+                                      Reshuffle All Players
+                                    </button>
+                                    )}
+
+                                    {/* Start Round Button - Only show if round is pending (matches may or may not exist) */}
+                                    {round.status === 'pending' && (
+                                      <button
+                                        onClick={() => {
+                                          // Start round - mark round as active
+                                          const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                            r.id === round.id ? { ...r, status: 'active' as const } : r
+                                          );
+                                          
+                                          this.setState({
+                                            currentGameMatch: {
+                                              ...this.state.currentGameMatch!,
+                                              rounds: updatedRounds
+                                            }
+                                          });
+                                        }}
+                                        className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 flex items-center gap-2"
+                                      >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m-5-8a4 4 0 118 0v1H7V6z" />
+                                        </svg>
+                                        Start Round
+                                      </button>
+                                    )}
+                                  </div>
+
+                  {round.matches && round.matches.length > 0 ? (
+                    <div>
+                      {/* Matches List */}
+                      <div className="space-y-4">
+                              {round.matches.map((match: TournamentMatch, index: number) => (
+                            <div key={match.id} className={`rounded-xl shadow-lg p-6 ${
+                              match.status === 'active' 
+                                ? 'bg-red-50 border-2 border-red-300' 
+                                : match.status === 'completed'
+                                ? 'bg-green-50 border-2 border-green-300'
+                                : 'bg-white border border-gray-200'
+                            }`}>
+                              <div className="flex items-center justify-between mb-4">
+                                    <h4 className="text-lg font-semibold text-gray-900">Match #{index + 1}</h4>
+                                    <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                      match.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                      match.status === 'active' ? 'bg-red-100 text-red-800' :
+                                      'bg-blue-100 text-blue-800'
+                                    }`}>
+                                      {match.status === 'completed' ? '✓ COMPLETED' :
+                                       match.status === 'active' ? '● LIVE' : '○ PENDING'}
+                                    </div>
+                                  </div>
+                              
+                              {/* Players */}
+                              <div className="flex items-center justify-between">
+                                {/* Player 1 */}
+                                <div className={`flex-1 p-4 rounded-lg border-2 transition-all ${
+                                      match.winner?.id === match.player1.id ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                                    }`}>
+                                      <div className="flex items-center gap-3">
+                                        <img
+                                          src={match.player1.profilePic}
+                                          alt={match.player1.name}
+                                          className="w-12 h-12 rounded-full object-cover border-2 border-blue-400"
+                                        />
+                                        <div className="flex-1">
+                                          <div className="font-semibold text-gray-900">{match.player1.name}</div>
+                                          <div className="text-sm text-gray-600">Rank #{Math.floor(Math.random() * 20) + 1}</div>
+                                          <div className="text-sm text-gray-600">Rating: {Math.floor(Math.random() * 500) + 1500}</div>
+                                        </div>
+                                        {match.winner?.id === match.player1.id && (
+                                          <div className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                            Winner
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+									
+									{/* VS */}
+                                    <div className="mx-4 flex flex-col items-center">
+                                      <div className="text-2xl font-bold text-gray-400">VS</div>
+                                      {match.status === 'completed' && match.score && (
+                                        <div className="text-sm font-semibold text-gray-600 mt-2">Score: {match.score}</div>
+                                      )}
+                                    </div>
+									
+									{/* Player 2 */}
+                                    <div className={`flex-1 p-4 rounded-lg border-2 transition-all ${
+                                      match.winner?.id === match.player2.id ? 'border-green-300 bg-green-50' : 'border-gray-200'
+                                    }`}>
+                                      <div className="flex items-center gap-3">
+                                        <img
+                                          src={match.player2.profilePic}
+                                          alt={match.player2.name}
+                                          className="w-12 h-12 rounded-full object-cover border-2 border-blue-400"
+                                        />
+                                        <div className="flex-1">
+                                          <div className="font-semibold text-gray-900">{match.player2.name}</div>
+                                          <div className="text-sm text-gray-600">Rank #{Math.floor(Math.random() * 20) + 1}</div>
+                                          <div className="text-sm text-gray-600">Rating: {Math.floor(Math.random() * 500) + 1500}</div>
+                                        </div>
+                                        {match.winner?.id === match.player2.id && (
+                                          <div className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                            Winner
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                              </div>
+                              
+                                  {/* Match Action Buttons - Only show when round is active */}
+                                  {match.status === 'pending' && round.status === 'active' && (
+                                    <div className="mt-4 flex gap-3 justify-center">
+                                      {/* Check if any other match in this round is LIVE */}
+                                      {round.matches.some(m => m.status === 'active') ? (
+                                        <div className="text-center py-4">
+                                          <div className="text-gray-500 text-sm">
+                                            ⏸️ Another match is currently LIVE
+                                          </div>
+                                          <div className="text-xs text-gray-400 mt-1">
+                                            Complete the active match to start this one
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          <button
+                                            onClick={() => {
+                                              // Start this match (set to active)
+                                              const updatedMatches = round.matches.map(m => 
+                                                m.id === match.id ? {
+                                                  ...m,
+                                                  status: 'active' as const,
+                                                  startTime: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })
+                                                } : m
+                                              );
+                                              
+                                              const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                r.id === round.id ? { ...r, matches: updatedMatches } : r
+                                              );
+                                              
+                                              this.setState({
+                                                currentGameMatch: {
+                                                  ...this.state.currentGameMatch!,
+                                                  rounds: updatedRounds
+                                                }
+                                              });
+                                            }}
+                                            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors font-medium flex items-center gap-2"
+                                          >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h8m-5-8a4 4 0 118 0v1H7V6z" />
+                                            </svg>
+                                            Start Match
+                                          </button>
+                                          <button
+                                            onClick={() => {
+                                              // Cancel this match (remove from round and move players to waiting)
+                                              const updatedMatches = round.matches.filter(m => m.id !== match.id);
+                                              
+                                              // Move cancelled match players to waiting status
+                                              const updatedRoundPlayers = round.players.map(p => {
+                                                if (p.id === match.player1.id || p.id === match.player2.id) {
+                                                  return { ...p, status: 'waiting' as const };
+                                                }
+                                                return p;
+                                              });
+                                              
+                                              const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                r.id === round.id ? { ...r, matches: updatedMatches, players: updatedRoundPlayers } : r
+                                              );
+                                              
+                                              this.setState({
+                                                currentGameMatch: {
+                                                  ...this.state.currentGameMatch!,
+                                                  rounds: updatedRounds
+                                                }
+                                              });
+                                            }}
+                                            className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2"
+                                          >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                            Cancel Match
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+
+{/* LIVE Match Details */}
+{match.status === 'active' && (
+                                    <div className="mt-4 bg-gradient-to-r from-red-50 to-pink-50 rounded-lg p-4 border border-red-200">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <h5 className="font-semibold text-gray-900">Match LIVE</h5>
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                                          <span className="text-sm text-red-700 font-medium">LIVE</span>
+                                        </div>
+                                      </div>
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                        <div className="bg-white p-3 rounded-lg border border-gray-200">
+                                          <div className="text-gray-600">Start Time</div>
+                                          <div className="font-semibold">{match.startTime || '22:23'}</div>
+                                          <div className="text-xs text-gray-500">Status: Started</div>
+                                        </div>
+                                        <div className="bg-white p-3 rounded-lg border border-gray-200">
+                                          <div className="text-gray-600">Current Time</div>
+                                          <div className="font-semibold">{new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' })}</div>
+                                          <div className="text-xs text-gray-500">Status: In Progress</div>
+                                        </div>
+                                        <div className="bg-white p-3 rounded-lg border border-gray-200">
+                                          <div className="text-gray-600">Duration</div>
+                                          <div className="font-semibold">{match.duration || '45 min'}</div>
+                                          <div className="text-xs text-gray-500">Type: Total Time</div>
+                                        </div>
+                                        <div className="bg-white p-3 rounded-lg border border-gray-200">
+                                          <div className="text-gray-600">Current Score</div>
+                                          <div className="font-semibold">{match.score || '8-6'}</div>
+                                          <div className="text-xs text-gray-500">Live Score</div>
+                                        </div>
+                                      </div>
+                                      
+                                      {/* Close Match Button */}
+                                      <div className="mt-4 flex justify-center">
+                                        <button
+                                          onClick={() => {
+                                            // Close match with random winner
+                                            const winner = Math.random() > 0.5 ? match.player1 : match.player2;
+                                            const loser = winner.id === match.player1.id ? match.player2 : match.player1;
+                                            const finalScore = winner.id === match.player1.id ? '14-6' : '6-14';
+                                            
+                                            // Update matches
+                                            const updatedMatches = round.matches.map(m => 
+                                              m.id === match.id ? {
+                                                ...m,
+                                                status: 'completed' as const,
+                                                winner: winner,
+                                                score: finalScore,
+                                                endTime: new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+                                                duration: '83 min'
+                                              } : m
+                                            );
+                                            
+                                            // Update players with match history and status
+                                            const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map(p => {
+                                              if (p.id === winner.id) {
+                                                return {
+                                                  ...p,
+                                                  matchesPlayed: (p.matchesPlayed || 0) + 1,
+                                                  roundsWon: [...(p.roundsWon || []), round.name],
+                                                  hasPlayed: true,
+                                                  status: 'winner' as const
+                                                };
+                                              } else if (p.id === loser.id) {
+                                                return {
+                                                  ...p,
+                                                  matchesPlayed: (p.matchesPlayed || 0) + 1,
+                                                  hasPlayed: true,
+                                                  status: 'eliminated' as const
+                                                };
+                                              }
+                                              return p;
+                                            });
+                                            
+                                            // Update round players with winner status
+                                            const updatedRoundPlayers = round.players.map(p => {
+                                              if (p.id === winner.id) {
+                                                return { ...p, status: 'winner' as const };
+                                              } else if (p.id === loser.id) {
+                                                return { ...p, status: 'eliminated' as const };
+                                              }
+                                              return p;
+                                            });
+                                            
+                                            const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => {
+                                              if (r.id === round.id) {
+                                                const updatedRound = { ...r, matches: updatedMatches, players: updatedRoundPlayers };
+                                                // Check if all matches are completed AND no unmatched players
+                                                const allMatchesCompleted = updatedMatches.length > 0 && updatedMatches.every(m => m.status === 'completed');
+                                                const noUnmatchedPlayers = !updatedRound.players.some(p => p.status === 'in_round' && !updatedMatches.some(m => m.player1.id === p.id || m.player2.id === p.id));
+                                                const noPendingMatches = !updatedMatches.some(m => m.status === 'pending' || m.status === 'active');
+                                                if (allMatchesCompleted && noUnmatchedPlayers && noPendingMatches) {
+                                                  updatedRound.status = 'completed' as const;
+                                                }
+                                                return updatedRound;
+                                              }
+                                              return r;
+                                            });
+                                            
+                                            this.setState({
+                                              currentGameMatch: {
+                                                ...this.state.currentGameMatch!,
+                                                rounds: updatedRounds,
+                                                allPlayers: updatedPlayers
+                                              }
+                                            });
+                                          }}
+                                          className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2"
+                                        >
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                          </svg>
+                                          Close Match
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+								  
+                    {match.status === 'completed' && (
+                                    <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                      <div className="bg-gray-50 p-3 rounded-lg">
+                                        <div className="text-gray-600">Start Time</div>
+                                        <div className="font-semibold">{match.startTime || '22:23'}</div>
+                                        <div className="text-xs text-gray-500">Status: Started</div>
+                                      </div>
+                                      <div className="bg-gray-50 p-3 rounded-lg">
+                                        <div className="text-gray-600">End Time</div>
+                                        <div className="font-semibold">{match.endTime || '23:45'}</div>
+                                        <div className="text-xs text-gray-500">Status: Finished</div>
+                                      </div>
+                                      <div className="bg-gray-50 p-3 rounded-lg">
+                                        <div className="text-gray-600">Duration</div>
+                                        <div className="font-semibold">{match.duration || '83 min'}</div>
+                                        <div className="text-xs text-gray-500">Type: Total Time</div>
+                                      </div>
+                                      <div className="bg-gray-50 p-3 rounded-lg">
+                                        <div className="text-gray-600">Score</div>
+                                        <div className="font-semibold">Final: {match.score || '14-6'}</div>
+                                      </div>
+                                      </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                      </div>
+                                      
+                                      {/* Unmatched Players Section */}
+                                      {(() => {
+                                        const matchedPlayerIds = new Set();
+                                        round.matches.forEach(match => {
+                                          matchedPlayerIds.add(match.player1.id);
+                                          matchedPlayerIds.add(match.player2.id);
+                                        });
+                                        const unmatchedPlayers = round.players.filter(p => 
+                                          p.status === 'in_round' && !matchedPlayerIds.has(p.id)
+                                        );
+                                        
+                                        // Debug logging
+                                        console.log('🔍 Unmatched Players Debug:', {
+                                          roundId: round.id,
+                                          roundPlayers: round.players.map(p => ({ name: p.name, status: p.status, id: p.id })),
+                                          matches: round.matches.map(m => ({ id: m.id, player1: m.player1.name, player2: m.player2.name })),
+                                          matchedPlayerIds: Array.from(matchedPlayerIds),
+                                          unmatchedPlayers: unmatchedPlayers.map(p => ({ name: p.name, status: p.status, id: p.id }))
+                                        });
+                                        
+                                        return unmatchedPlayers.length > 0 ? (
+                                          <div className="mt-6">
+                                            <h4 className="text-lg font-semibold text-gray-900 mb-4">Unmatched Players ({unmatchedPlayers.length})</h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                              {unmatchedPlayers.map((player: Player, index: number) => (
+                                                <div 
+                                                  key={player.id} 
+                                                  className={`bg-yellow-50 p-4 rounded-lg border-2 transition-all cursor-pointer hover:border-yellow-300 hover:shadow-md ${
+                                                    player.selected ? 'border-yellow-500 bg-yellow-100' : 'border-yellow-200'
+                                                  }`}
+                                                  onClick={() => {
+                                                    // Toggle selection for this player
+                                                    const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                      r.id === round.id 
+                                                        ? { ...r, players: r.players.map(p => p.id === player.id ? { ...p, selected: !p.selected } : p) }
+                                                        : r
+                                                    );
+                                                    const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                      p.id === player.id ? { ...p, selected: !p.selected } : p
+                                                    );
+                                                    this.setState({
+                                                      currentGameMatch: {
+                                                        ...this.state.currentGameMatch!,
+                                                        allPlayers: updatedPlayers,
+                                                        rounds: updatedRounds
+                                                      }
+                                                    });
+                                                  }}
+                                                >
+                                                  <div className="flex items-center gap-3 mb-3">
+                                                    <img
+                                                      src={player.profilePic}
+                                                      alt={player.name}
+                                                      className="w-12 h-12 rounded-full object-cover border-2 border-yellow-400"
+                                                    />
+                                                    <div className="flex-1">
+                                                      <div className="font-semibold text-gray-900">{player.name}</div>
+                                                      <div className="text-sm text-gray-600">{player.email}</div>
+                                                    </div>
+                                                    <input
+                                                      type="checkbox"
+                                                      checked={player.selected || false}
+                                                      onChange={() => {}} // Handled by parent onClick
+                                                      className="w-4 h-4 text-yellow-600 bg-gray-100 border-gray-300 rounded focus:ring-yellow-500"
+                                                    />
+                                                  </div>
+                                                  <div className="flex items-center justify-between">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                      player.skill === 'Beginner' ? 'bg-green-100 text-green-800' :
+                                                      player.skill === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
+                                                      'bg-red-100 text-red-800'
+                                                    }`}>
+                                                      {player.skill}
+                                                    </span>
+                                                    <div className="bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                                      Unmatched
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                            
+                                            {/* Unmatched Players Controls */}
+                                            {unmatchedPlayers.filter(p => p.selected).length > 0 && (
+                                              <div className="mt-4 p-4 bg-yellow-100 rounded-lg border border-yellow-300">
+                                                <div className="flex items-center justify-between mb-2">
+                                                  <span className="text-sm font-medium text-yellow-800">
+                                                    {unmatchedPlayers.filter(p => p.selected).length} unmatched players selected
+                                                  </span>
+                                                  <div className="flex gap-2">
+                                                    <button
+                                                      onClick={() => {
+                                                        // Select all unmatched players
+                                                        const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                          r.id === round.id 
+                                                            ? { ...r, players: r.players.map(p => 
+                                                                unmatchedPlayers.some(up => up.id === p.id) 
+                                                                  ? { ...p, selected: true }
+                                                                  : p
+                                                              ) }
+                                                            : r
+                                                        );
+                                                        const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                          unmatchedPlayers.some(up => up.id === p.id) 
+                                                            ? { ...p, selected: true }
+                                                            : p
+                                                        );
+                                                        this.setState({
+                                                          currentGameMatch: {
+                                                            ...this.state.currentGameMatch!,
+                                                            allPlayers: updatedPlayers,
+                                                            rounds: updatedRounds
+                                                          }
+                                                        });
+                                                      }}
+                                                      className="px-3 py-1 bg-yellow-200 text-yellow-800 rounded-lg hover:bg-yellow-300 transition-colors text-sm font-medium"
+                                                    >
+                                                      Select All Unmatched
+                                                    </button>
+                                                    <button
+                                                      onClick={() => {
+                                                        // Deselect all unmatched players
+                                                        const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                          r.id === round.id 
+                                                            ? { ...r, players: r.players.map(p => 
+                                                                unmatchedPlayers.some(up => up.id === p.id) 
+                                                                  ? { ...p, selected: false }
+                                                                  : p
+                                                              ) }
+                                                            : r
+                                                        );
+                                                        const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                          unmatchedPlayers.some(up => up.id === p.id) 
+                                                            ? { ...p, selected: false }
+                                                            : p
+                                                        );
+                                                        this.setState({
+                                                          currentGameMatch: {
+                                                            ...this.state.currentGameMatch!,
+                                                            allPlayers: updatedPlayers,
+                                                            rounds: updatedRounds
+                                                          }
+                                                        });
+                                                      }}
+                                                      className="px-3 py-1 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm font-medium"
+                                                    >
+                                                      Deselect All Unmatched
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                  <button
+                                                    onClick={() => {
+                                                      // Move selected unmatched players to waiting area
+                                                      const selectedPlayerIds = unmatchedPlayers.filter(p => p.selected).map(p => p.id);
+                                                      
+                                                      const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                        r.id === round.id 
+                                                          ? { ...r, players: r.players.map(p => 
+                                                              selectedPlayerIds.includes(p.id) 
+                                                                ? { ...p, status: 'waiting' as const, selected: false }
+                                                                : p
+                                                            ) }
+                                                          : r
+                                                      );
+                                                      
+                                                      const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                        selectedPlayerIds.includes(p.id) 
+                                                          ? { ...p, status: 'waiting' as const, selected: false }
+                                                          : p
+                                                      );
+                                                      
+                                                      this.setState({
+                                                        currentGameMatch: {
+                                                          ...this.state.currentGameMatch!,
+                                                          allPlayers: updatedPlayers,
+                                                          rounds: updatedRounds
+                                                        }
+                                                      });
+                                                      
+                                                      console.log('⏳ Moved', selectedPlayerIds.length, 'unmatched players to waiting area');
+                                                    }}
+                                                    className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium flex items-center gap-2"
+                                                  >
+                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                    Move Selected to Waiting Area ({unmatchedPlayers.filter(p => p.selected).length})
+                                                  </button>
+                            </div>
+                      </div>
+                                            )}
+                                          </div>
+                                        ) : null;
+                                      })()}
+                      
+                    </div>
+                                  ) : round.players.length > 0 ? (
+                      <div>
+                       <div className="mb-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                          <h4 className="text-lg font-semibold text-gray-900">Players in Round ({round.players.length})</h4>
+                                          <div className="flex gap-2">
+                                            <button
+                                              onClick={() => {
+                                                // Select all players in this round
+                                                const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                  r.id === round.id 
+                                                    ? { ...r, players: r.players.map(p => ({ ...p, selected: true })) }
+                                                    : r
+                                                );
+                                                const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                  round.players.some(rp => rp.id === p.id) ? { ...p, selected: true } : p
+                                                );
+                                                this.setState({
+                                                  currentGameMatch: {
+                                                    ...this.state.currentGameMatch!,
+                                                    allPlayers: updatedPlayers,
+                                                    rounds: updatedRounds
+                                                  }
+                                                });
+                                              }}
+                                              className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
+                                            >
+                                              Select All
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                // Deselect all players in this round
+                                                const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                  r.id === round.id 
+                                                    ? { ...r, players: r.players.map(p => ({ ...p, selected: false })) }
+                                                    : r
+                                                );
+                                                const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                  round.players.some(rp => rp.id === p.id) ? { ...p, selected: false } : p
+                                                );
+                                                this.setState({
+                                                  currentGameMatch: {
+                                                    ...this.state.currentGameMatch!,
+                                                    allPlayers: updatedPlayers,
+                                                    rounds: updatedRounds
+                                                  }
+                                                });
+                                              }}
+                                              className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                                            >
+                                              Deselect All
+                                            </button>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center justify-between mb-4">
+                                          <p className="text-gray-600 text-sm">Select players you want to exclude from shuffling</p>
+                                          {round.players.filter(p => p.selected).length > 0 && (
+                                            <div className="flex gap-2">
+                                              <button
+                                                onClick={() => {
+                                                  // Move selected players back to available
+                                                  const selectedPlayerIds = round.players.filter(p => p.selected).map(p => p.id);
+                                                  
+                                                  // Remove selected players from round
+                                                  const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                    r.id === round.id 
+                                                      ? { ...r, players: r.players.filter(p => !p.selected) }
+                                                      : r
+                                                  );
+                                                  
+                                                  // Update players status back to available
+                                                  const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                    selectedPlayerIds.includes(p.id) 
+                                                      ? { ...p, status: 'available' as const, selected: false, currentRound: null }
+                                                      : p
+                                                  );
+                                                  
+                                                  this.setState({
+                                                    currentGameMatch: {
+                                                      ...this.state.currentGameMatch!,
+                                                      allPlayers: updatedPlayers,
+                                                      rounds: updatedRounds
+                                                    }
+                                                  });
+                                                  
+                                                  console.log('🔄 Moved', selectedPlayerIds.length, 'players back to available');
+                                                }}
+                                                className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium flex items-center gap-2"
+                                              >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16l-4-4m0 0l4-4m-4 4h18" />
+                                                </svg>
+                                                Back to Available ({round.players.filter(p => p.selected).length})
+                                              </button>
+                                              
+                                              <button
+                                                onClick={() => {
+                                                  // Move selected players to waiting area
+                                                  const selectedPlayerIds = round.players.filter(p => p.selected).map(p => p.id);
+                                                  
+                                                  // Update selected players status to waiting
+                                                  const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                    r.id === round.id 
+                                                      ? { ...r, players: r.players.map(p => 
+                                                          p.selected 
+                                                            ? { ...p, status: 'waiting' as const, selected: false }
+                                                            : p
+                                                        ) }
+                                                      : r
+                                                  );
+                                                  
+                                                  const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                    selectedPlayerIds.includes(p.id) 
+                                                      ? { ...p, status: 'waiting' as const, selected: false }
+                                                      : p
+                                                  );
+                                                  
+                                                  this.setState({
+                                                    currentGameMatch: {
+                                                      ...this.state.currentGameMatch!,
+                                                      allPlayers: updatedPlayers,
+                                                      rounds: updatedRounds
+                                                    }
+                                                  });
+                                                  
+                                                  console.log('⏳ Moved', selectedPlayerIds.length, 'players to waiting area');
+                                                }}
+                                                className="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium flex items-center gap-2"
+                                              >
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                Move to Waiting Area ({round.players.filter(p => p.selected).length})
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                        {round.players.map((player: Player, index: number) => (
+                                          <div 
+                                            key={player.id} 
+                                            className={`bg-blue-50 p-4 rounded-lg border-2 transition-all cursor-pointer hover:border-blue-300 hover:shadow-md ${
+                                              player.selected ? 'border-blue-500 bg-blue-100' : 'border-blue-200'
+                                            }`}
+                                            onClick={() => {
+                                              // Toggle selection for this player
+                                              const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                                r.id === round.id 
+                                                  ? { ...r, players: r.players.map(p => p.id === player.id ? { ...p, selected: !p.selected } : p) }
+                                                  : r
+                                              );
+                                              const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                p.id === player.id ? { ...p, selected: !p.selected } : p
+                                              );
+                                              this.setState({
+                                                currentGameMatch: {
+                                                  ...this.state.currentGameMatch!,
+                                                  allPlayers: updatedPlayers,
+                                                  rounds: updatedRounds
+                                                }
+                                              });
+                                            }}
+                                          >
+                                            <div className="flex items-center gap-3 mb-3">
+                                              <img
+                                                src={player.profilePic}
+                                                alt={player.name}
+                                                className="w-12 h-12 rounded-full object-cover border-2 border-blue-400"
+                                              />
+                                              <div className="flex-1">
+                                                <div className="font-semibold text-gray-900">{player.name}</div>
+                                                <div className="text-sm text-gray-600">{player.email}</div>
+                                              </div>
+                                              <div className="flex items-center gap-2">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={player.selected || false}
+                                                  onChange={() => {}} // Handled by parent onClick
+                                                  className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                                                />
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                                player.skill === 'Beginner' ? 'bg-green-100 text-green-800' :
+                                                player.skill === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
+                                                'bg-red-100 text-red-800'
+                                              }`}>
+                                                {player.skill}
+                                              </span>
+                                              <div className="bg-blue-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                                Player #{index + 1}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <div className="text-gray-500 text-lg mb-2">No players in this round yet</div>
+                        <div className="text-gray-400 text-sm">Select players from the available list and move them to this round</div>
+                      </div>
+                  )}
+                </div>
+              )}
+
+ {/* Waiting Area Tab */}
+ {this.state.activeRoundSubTab[round.id] === 'waiting' && (
+                                <div>
+                                  <div className="mb-4">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <h4 className="text-lg font-semibold text-gray-900">Players in Waiting Area</h4>
+                                      <span className="bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                                        {round.players?.filter(p => p.status === 'waiting').length || 0} Players
+                                      </span>
+                                    </div>
+                                    <div className="flex gap-2 mb-4">
+                                      <button
+                                        onClick={() => {
+                                          // Select all waiting players
+                                          const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                            r.id === round.id 
+                                              ? { ...r, players: r.players.map(p => p.status === 'waiting' ? { ...p, selected: true } : p) }
+                                              : r
+                                          );
+                                          const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                            round.players.some(rp => rp.id === p.id && rp.status === 'waiting') ? { ...p, selected: true } : p
+                                          );
+                                          this.setState({
+                                            currentGameMatch: {
+                                              ...this.state.currentGameMatch!,
+                                              allPlayers: updatedPlayers,
+                                              rounds: updatedRounds
+                                            }
+                                          });
+                                        }}
+                                        className="px-3 py-1 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-sm font-medium"
+                                      >
+                                        Select All
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          // Deselect all waiting players
+                                          const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                            r.id === round.id 
+                                              ? { ...r, players: r.players.map(p => p.status === 'waiting' ? { ...p, selected: false } : p) }
+                                              : r
+                                          );
+                                          const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                            round.players.some(rp => rp.id === p.id && rp.status === 'waiting') ? { ...p, selected: false } : p
+                                          );
+                                          this.setState({
+                                            currentGameMatch: {
+                                              ...this.state.currentGameMatch!,
+                                              allPlayers: updatedPlayers,
+                                              rounds: updatedRounds
+                                            }
+                                          });
+                                        }}
+                                        className="px-3 py-1 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
+                                      >
+                                        Deselect All
+                                      </button>
+                                    </div>
+                                    
+                                    {/* Navigation Options for Selected Players */}
+                                    {round.players?.filter(p => p.status === 'waiting' && p.selected).length > 0 && (
+                                      <div className="flex gap-2 mb-4 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                                        <button
+                                          onClick={() => {
+                                            // Move selected players back to dashboard (available)
+                                            const selectedPlayerIds = round.players.filter(p => p.status === 'waiting' && p.selected).map(p => p.id);
+                                            
+                                            // Remove from round and update status to available
+                                            const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                              r.id === round.id 
+                                                ? { ...r, players: r.players.filter(p => !(p.status === 'waiting' && p.selected)) }
+                                                : r
+                                            );
+                                            
+                                            const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                              selectedPlayerIds.includes(p.id) 
+                                                ? { ...p, status: 'available' as const, selected: false, currentRound: null }
+                                                : p
+                                            );
+                                            
+                                            this.setState({
+                                              currentGameMatch: {
+                                                ...this.state.currentGameMatch!,
+                                                allPlayers: updatedPlayers,
+                                                rounds: updatedRounds
+                                              }
+                                            });
+                                            
+                                            console.log('🏠 Moved', selectedPlayerIds.length, 'players back to dashboard');
+                                          }}
+                                          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm font-medium flex items-center gap-2"
+                                        >
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                                          </svg>
+                                          Back to Dashboard ({round.players?.filter(p => p.status === 'waiting' && p.selected).length})
+                                        </button>
+                                        
+                                        <button
+                                          onClick={() => {
+                                            // Move selected players back to matches (available for shuffling)
+                                            const selectedPlayerIds = round.players.filter(p => p.status === 'waiting' && p.selected).map(p => p.id);
+                                            
+                                            // Update status from waiting to in_round (available for shuffling)
+                                            const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                              r.id === round.id 
+                                                ? { ...r, players: r.players.map(p => 
+                                                    p.status === 'waiting' && p.selected 
+                                                      ? { ...p, status: 'in_round' as const, selected: false }
+                                                      : p
+                                                  ) }
+                                                : r
+                                            );
+                                            
+                                            const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                              selectedPlayerIds.includes(p.id) 
+                                                ? { ...p, status: 'in_round' as const, selected: false }
+                                                : p
+                                            );
+                                            
+                                            this.setState({
+                                              currentGameMatch: {
+                                                ...this.state.currentGameMatch!,
+                                                allPlayers: updatedPlayers,
+                                                rounds: updatedRounds
+                                              }
+                                            });
+                                            
+                                            console.log('🎲 Moved', selectedPlayerIds.length, 'players back to matches section');
+                                          }}
+                                          className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm font-medium flex items-center gap-2"
+                                        >
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                          </svg>
+                                          Back to Matches ({round.players?.filter(p => p.status === 'waiting' && p.selected).length})
+                                        </button>
+                                        
+                                        <button
+                                          onClick={() => {
+                                            // Move selected players to waiting area manually
+                                            const selectedPlayerIds = round.players.filter(p => p.status === 'waiting' && p.selected).map(p => p.id);
+                                            
+                                            // Players are already in waiting area, just deselect them
+                                            const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                              r.id === round.id 
+                                                ? { ...r, players: r.players.map(p => 
+                                                    p.status === 'waiting' && p.selected 
+                                                      ? { ...p, selected: false }
+                                                      : p
+                                                  ) }
+                                                : r
+                                            );
+                                            
+                                            const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                              selectedPlayerIds.includes(p.id) 
+                                                ? { ...p, selected: false }
+                                                : p
+                                            );
+                                            
+                                            this.setState({
+                                              currentGameMatch: {
+                                                ...this.state.currentGameMatch!,
+                                                allPlayers: updatedPlayers,
+                                                rounds: updatedRounds
+                                              }
+                                            });
+                                            
+                                            console.log('✅ Kept', selectedPlayerIds.length, 'players in waiting area');
+                                          }}
+                                          className="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm font-medium flex items-center gap-2"
+                                        >
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                          </svg>
+                                          Keep in Waiting Area ({round.players?.filter(p => p.status === 'waiting' && p.selected).length})
+                                        </button>
+                                        
+                                        {/* Move to Other Rounds */}
+                                        {this.state.currentGameMatch!.rounds!.filter(r => r.id !== round.id).length > 0 && (
+                                          <select
+                                            onChange={(e) => {                                             
+                                              if (e.target.value) {
+                                                const selectedPlayerIds = round.players.filter(p => p.status === 'waiting' && p.selected).map(p => p.id);
+                                                
+                                                // Move players to selected round
+                                                const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => {
+                                                  if (r.id === round.id) {
+                                                    // Remove from current round
+                                                    return { ...r, players: r.players.filter(p => !(p.status === 'waiting' && p.selected)) };
+                                                  } else if (r.id === e.target.value) {
+                                                    // Add to target round
+                                                    const playersToMove = round.players.filter(p => p.status === 'waiting' && p.selected).map(p => ({
+                                                      ...p, 
+                                                      status: 'in_round' as const, 
+                                                      selected: false,
+                                                      currentRound: e.target.value
+                                                    }));
+                                                    return { ...r, players: [...r.players, ...playersToMove] };
+                                                  }
+                                                  return r;
+                                                });
+                                                
+                                                const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                                  selectedPlayerIds.includes(p.id) 
+                                                    ? { ...p, status: 'in_round' as const, selected: false, currentRound: e.target.value }
+                                                    : p
+                                                );
+                                                
+                                                this.setState({
+                                                  currentGameMatch: {
+                                                    ...this.state.currentGameMatch!,
+                                                    allPlayers: updatedPlayers,
+                                                    rounds: updatedRounds
+                                                  }
+                                                });
+                                                
+                                                console.log('🔄 Moved', selectedPlayerIds.length, 'players to round', e.target.value);
+                                                e.target.value = '';
+                                              }
+                                            }}
+                                            className="px-3 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm font-medium"
+                                          >
+                                            <option value="">Move to Round...</option>
+                                            {this.state.currentGameMatch!.rounds!.filter(r => r.id !== round.id).map((r: TournamentRound) => (
+                                              <option key={r.id} value={r.id}>
+                                                {r.name} ({r.players.length} players)
+                                              </option>
+                                            ))}
+                                          </select>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                  
+                                  {round.players?.filter(p => p.status === 'waiting').length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                      {round.players.filter(p => p.status === 'waiting').map((player: Player, index: number) => (
+                                        <div 
+                                          key={player.id} 
+                                          className={`bg-orange-50 p-4 rounded-lg border-2 transition-all cursor-pointer hover:border-orange-300 hover:shadow-md ${
+                                            player.selected ? 'border-orange-500 bg-orange-100' : 'border-orange-200'
+                                          }`}
+                                          onClick={() => {
+                                            // Toggle selection for this waiting player
+                                            const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                              r.id === round.id 
+                                                ? { ...r, players: r.players.map(p => p.id === player.id ? { ...p, selected: !p.selected } : p) }
+                                                : r
+                                            );
+                                            const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                              p.id === player.id ? { ...p, selected: !p.selected } : p
+                                            );
+                                            this.setState({
+                                              currentGameMatch: {
+                                                ...this.state.currentGameMatch!,
+                                                allPlayers: updatedPlayers,
+                                                rounds: updatedRounds
+                                              }
+                                            });
+                                          }}
+                                        >
+                                          <div className="flex items-center gap-3 mb-3">
+                                            <img
+                                              src={player.profilePic}
+                                              alt={player.name}
+                                              className="w-12 h-12 rounded-full object-cover border-2 border-orange-400"
+                                            />
+                                            <div className="flex-1">
+                                              <div className="font-semibold text-gray-900">{player.name}</div>
+                                              <div className="text-sm text-gray-600">{player.email}</div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <input
+                                                type="checkbox"
+                                                checked={player.selected || false}
+                                                onChange={() => {}} // Handled by parent onClick
+                                                className="w-4 h-4 text-orange-600 bg-gray-100 border-gray-300 rounded focus:ring-orange-500"
+                                              />
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center justify-between">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                              player.skill === 'Beginner' ? 'bg-green-100 text-green-800' :
+                                              player.skill === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
+                                              'bg-red-100 text-red-800'
+                                            }`}>
+                                              {player.skill}
+                                            </span>
+                                            <div className="bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                              Waiting
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-12">
+                                      <div className="text-gray-500 text-lg mb-2">No players in waiting area</div>
+                                      <div className="text-gray-400 text-sm">Selected players from shuffle will appear here</div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                                  {/* Winners Tab */}
+                                  {this.state.activeRoundSubTab[round.id] === 'winners' && (
+                                <div>
+                                  <div className="flex items-center justify-between mb-6">
+                                    <h4 className="text-lg font-semibold text-gray-900">Round Winners</h4>
+                                    <span className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
+                                      {round.players?.filter(p => p.status === 'winner').length || 0} Winners
+                                    </span>
+                                  </div>
+                                  {round.players?.filter(p => p.status === 'winner').length > 0 ? (
+                                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                                      {round.players.filter(p => p.status === 'winner').map((player: Player, index: number) => (
+                                        <div key={player.id} className="bg-green-50 p-4 rounded-lg border-2 border-green-200">
+                                          <div className="flex items-center gap-3 mb-3">
+                                            <img
+                                              src={player.profilePic}
+                                              alt={player.name}
+                                              className="w-12 h-12 rounded-full object-cover border-2 border-green-400"
+                                            />
+                                            <div className="flex-1">
+                                              <div className="font-semibold text-gray-900">{player.name}</div>
+                                              <div className="text-sm text-gray-600">{player.email}</div>
+                                            </div>
+                                          </div>
+                                          <div className="flex items-center justify-between">
+                                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                              player.skill === 'Beginner' ? 'bg-green-100 text-green-800' :
+                                              player.skill === 'Intermediate' ? 'bg-yellow-100 text-yellow-800' :
+                                              'bg-red-100 text-red-800'
+                                            }`}>
+                                              {player.skill}
+                                            </span>
+                                            <div className="bg-green-500 text-white px-2 py-1 rounded-full text-xs font-bold">
+                                              Winner
+                                            </div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="text-center py-12">
+                                      <div className="text-gray-500 text-lg mb-2">No winners yet</div>
+                                      <div className="text-gray-400 text-sm">Completed match winners will appear here</div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+            </div>
+            )}
+
+             {/* Original Players Display (when no sub-tabs) */}
+             {this.state.activeRoundTab !== round.id && (round.players.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                            {round.players.map((player: Player, index: number) => (
+                              <div 
+                                key={player.id} 
+                                className={`bg-gray-50 p-4 rounded-lg border-2 transition-all cursor-pointer hover:border-blue-300 hover:shadow-md ${
+                                  player.selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+                                }`}
+                                onClick={() => {
+                                  // Toggle selection for this player when clicking anywhere on the card
+                                  const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                    r.id === round.id 
+                                      ? { ...r, players: r.players.map(p => p.id === player.id ? { ...p, selected: !p.selected } : p) }
+                                      : r
+                                  );
+                                  const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                    p.id === player.id ? { ...p, selected: !p.selected } : p
+                                  );
+                                  this.setState({
+                                    currentGameMatch: {
+                                      ...this.state.currentGameMatch!,
+                                      allPlayers: updatedPlayers,
+                                      rounds: updatedRounds
+                                    }
+                                  });
+                                }}
+                              >
+                                <div className="flex items-center gap-3 mb-2">
+                                  <div className="relative">
+                                    <img
+                                      src={player.profilePic}
+                                      alt={player.name}
+                                      className="w-10 h-10 rounded-full object-cover border-2 border-blue-400"
+                                    />
+                                    <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                                      {index + 1}
+                                    </div>
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="font-medium text-gray-900">{player.name}</div>
+                                    <div className="text-sm text-gray-600">{player.email}</div>
+                                  </div>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                  <span className={`text-xs px-2 py-1 rounded ${
+                                    player.skill === 'Pro' ? 'bg-purple-100 text-purple-800' :
+                                    player.skill === 'Expert' ? 'bg-red-100 text-red-800' :
+                                    player.skill === 'Advanced' ? 'bg-blue-100 text-blue-800' :
+                                    'bg-green-100 text-green-800'
+                                  }`}>
+                                    {player.skill}
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="checkbox"
+                                      checked={player.selected}
+                                      onChange={() => {
+                                        // Toggle selection for this player
+                                        const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                          r.id === round.id 
+                                            ? { ...r, players: r.players.map(p => p.id === player.id ? { ...p, selected: !p.selected } : p) }
+                                            : r
+                                        );
+                                        const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                          p.id === player.id ? { ...p, selected: !p.selected } : p
+                                        );
+                                        this.setState({
+                                          currentGameMatch: {
+                                            ...this.state.currentGameMatch!,
+                                            allPlayers: updatedPlayers,
+                                            rounds: updatedRounds
+                                          }
+                                        });
+                                      }}
+                                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                      onClick={(e) => e.stopPropagation()}
+                                    />
+                                    /*<button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        // Move single player to lobby
+                                        const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                          r.id === round.id ? { ...r, players: r.players.filter(p => p.id !== player.id) } : r
+                                        );
+                                        const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((p: Player) => 
+                                          p.id === player.id 
+                                            ? { ...p, status: 'in_lobby' as const, currentRound: null, selected: false }
+                                            : p
+                                        );
+                                        this.setState({
+                                          currentGameMatch: {
+                                            ...this.state.currentGameMatch!,
+                                            allPlayers: updatedPlayers,
+                                            rounds: updatedRounds
+                                          }
+                                        });
+                                      }}
+                                      className="text-gray-400 hover:text-red-600 transition-colors text-xs"
+                                      title="Move to Lobby"
+                                    >
+                                      🏟️
+                                    </button>
+                                    */
+
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-12 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                            <div className="text-4xl mb-4">👥</div>
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">No players in this round yet</h3>
+                            <p className="text-sm">Select players from the available list and move them to this round</p>
+                          </div>
+                        ))}
+
+ {/* Control Buttons */}
+ {round.players.length > 0 && (
+                          <div className="mt-6 pt-4 border-t border-gray-200">
+                            <div className="flex items-center justify-between mb-3">
+                              <div className="text-sm text-gray-600">
+                                {round.players.filter(p => p.selected).length} players selected
+                              </div>
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => {
+                                    // Select all players in this round
+                                    const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                      r.id === round.id ? { ...r, players: r.players.map(p => ({ ...p, selected: true })) } : r
+                                    );
+                                    const roundPlayerIds = round.players.map(p => p.id);
+                                    const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((player: Player) => 
+                                      roundPlayerIds.includes(player.id) ? { ...player, selected: true } : player
+                                    );
+                                    this.setState({
+                                      currentGameMatch: {
+                                        ...this.state.currentGameMatch!,
+                                        allPlayers: updatedPlayers,
+                                        rounds: updatedRounds
+                                      }
+                                    });
+                                  }}
+                                  className="px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded hover:bg-blue-200 transition-colors font-medium"
+                                >
+                                  Select All
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    // Deselect all players in this round
+                                    const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                      r.id === round.id ? { ...r, players: r.players.map(p => ({ ...p, selected: false })) } : r
+                                    );
+                                    const roundPlayerIds = round.players.map(p => p.id);
+                                    const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((player: Player) => 
+                                      roundPlayerIds.includes(player.id) ? { ...player, selected: false } : player
+                                    );
+                                    this.setState({
+                                      currentGameMatch: {
+                                        ...this.state.currentGameMatch!,
+                                        allPlayers: updatedPlayers,
+                                        rounds: updatedRounds
+                                      }
+                                    });
+                                  }}
+                                  className="px-3 py-1 bg-blue-100 text-blue-800 text-xs rounded hover:bg-blue-200 transition-colors font-medium"
+                                >
+                                  Deselect All
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => {
+                                  // Move selected players to lobby
+                                  const selectedPlayerIds = round.players.filter(p => p.selected).map(p => p.id);
+                                  const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                    r.id === round.id ? { ...r, players: r.players.filter(p => !p.selected) } : r
+                                  );
+                                  const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((player: Player) => 
+                                    selectedPlayerIds.includes(player.id) 
+                                      ? { ...player, status: 'in_lobby' as const, currentRound: null, selected: false }
+                                      : player
+                                  );
+                                  this.setState({
+                                    currentGameMatch: {
+                                      ...this.state.currentGameMatch!,
+                                      allPlayers: updatedPlayers,
+                                      rounds: updatedRounds
+                                    }
+                                  });
+                                }}
+                                disabled={round.players.filter(p => p.selected).length === 0}
+                                className="px-4 py-2 bg-orange-100 text-orange-800 text-sm rounded hover:bg-orange-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                              >
+                                Move Selected to Lobby
+                              </button>
+                              <button
+                                onClick={() => {
+                                  // Remove all players from this round
+                                  const roundPlayerIds = round.players.map(p => p.id);
+                                  const updatedRounds = this.state.currentGameMatch!.rounds!.map((r: TournamentRound) => 
+                                    r.id === round.id ? { ...r, players: [] } : r
+                                  );
+                                  const updatedPlayers = this.state.currentGameMatch!.allPlayers!.map((player: Player) => 
+                                    roundPlayerIds.includes(player.id) 
+                                      ? { ...player, status: 'available' as const, currentRound: null, selected: false }
+                                      : player
+                                  );
+                                  this.setState({
+                                    currentGameMatch: {
+                                      ...this.state.currentGameMatch!,
+                                      allPlayers: updatedPlayers,
+                                      rounds: updatedRounds
+                                    }
+                                  });
+                                }}
+                                className="px-4 py-2 bg-pink-100 text-pink-800 text-sm rounded hover:bg-pink-200 transition-colors font-medium"
+                              >
+                                Clear All
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                  )}
+                          </div>
+                        )}
 
               {/* Dual Lobby System */}
               {(this.state.currentGameMatch.allPlayers?.some(p => p.status === 'in_lobby') || 
@@ -7451,12 +6753,11 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                 </div>
                                 <div className="text-center">
                                   <img
-                                    src={getAvatar(player.profilePic)}
-                                    alt={this.getPlayerDisplayName(player)}
+                                    src={player.profilePic}
+                                    alt={player.name}
                                     className="w-12 h-12 rounded-full object-cover border-2 border-blue-400 mx-auto mb-2"
-                                    onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                                   />
-                                  <div className="font-medium text-gray-900 text-sm truncate mb-1">{this.getPlayerDisplayName(player)}</div>
+                                  <div className="font-medium text-gray-900 text-sm truncate mb-1">{player.name}</div>
                                   <div className="text-xs text-gray-500 truncate mb-2">{player.email}</div>
                                   <span className={`text-xs px-2 py-1 rounded font-medium ${
                                     player.skill === 'Pro' ? 'bg-purple-100 text-purple-800' :
@@ -7536,12 +6837,11 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                   </div>
                                   <div className="text-center">
                                     <img
-                                      src={getAvatar(player.profilePic)}
-                                      alt={this.getPlayerDisplayName(player)}
+                                      src={player.profilePic}
+                                      alt={player.name}
                                       className="w-12 h-12 rounded-full object-cover border-2 border-green-400 mx-auto mb-2"
-                                      onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                                     />
-                                    <div className="font-medium text-gray-900 text-sm truncate mb-1">{this.getPlayerDisplayName(player)}</div>
+                                    <div className="font-medium text-gray-900 text-sm truncate mb-1">{player.name}</div>
                                     <div className="text-xs text-gray-500 truncate mb-2">{player.email}</div>
                                     <span className={`text-xs px-2 py-1 rounded font-medium ${
                                       player.skill === 'Pro' ? 'bg-purple-100 text-purple-800' :
@@ -7608,17 +6908,16 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           <div className="flex items-center gap-3 mb-2">
                             <div className="relative">
                               <img
-                                src={getAvatar(player.profilePic)}
-                                alt={this.getPlayerDisplayName(player)}
+                                src={player.profilePic}
+                                alt={player.name}
                                 className="w-10 h-10 rounded-full object-cover border-2 border-blue-400"
-                                onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                               />
                               <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
                                 {player.id}
                               </div>
                             </div>
                             <div className="flex-1">
-                              <div className="font-medium text-gray-900">{this.getPlayerDisplayName(player)}</div>
+                              <div className="font-medium text-gray-900">{player.name}</div>
                               <div className="text-sm text-gray-600">{player.email}</div>
                             </div>
                           </div>
@@ -7702,17 +7001,16 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                             <div className="flex items-center gap-3 flex-1 bg-green-50 p-4 rounded-lg border border-green-200">
                               <div className="relative">
                                 <img
-                                  src={getAvatar(match.player1.profilePic)}
-                                  alt={this.getPlayerDisplayName(match.player1)}
+                                  src={match.player1.profilePic}
+                                  alt={match.player1.name}
                                   className="w-16 h-16 rounded-full object-cover border-2 border-green-400"
-                                  onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                                 />
                                 <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full font-bold">
                                   Winner
                                 </div>
                               </div>
                               <div>
-                                <div className="font-semibold text-gray-900 text-lg">{this.getPlayerDisplayName(match.player1)}</div>
+                                <div className="font-semibold text-gray-900 text-lg">{match.player1.name}</div>
                                 <div className="text-sm text-gray-600">Rank #{match.player1.rank} â€¢ Rating: {match.player1.rating}</div>
                               </div>
                             </div>
@@ -7728,14 +7026,13 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                             <div className="flex items-center gap-3 flex-1 bg-white p-4 rounded-lg border border-gray-200">
                               <div className="relative">
                                 <img
-                                  src={getAvatar(match.player2.profilePic)}
-                                  alt={this.getPlayerDisplayName(match.player2)}
+                                  src={match.player2.profilePic}
+                                  alt={match.player2.name}
                                   className="w-16 h-16 rounded-full object-cover border-2 border-gray-300"
-                                  onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                                 />
                               </div>
                               <div>
-                                <div className="font-semibold text-gray-900 text-lg">{this.getPlayerDisplayName(match.player2)}</div>
+                                <div className="font-semibold text-gray-900 text-lg">{match.player2.name}</div>
                                 <div className="text-sm text-gray-600">Rank #{match.player2.rank} â€¢ Rating: {match.player2.rating}</div>
                               </div>
                             </div>
@@ -7798,7 +7095,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
             <div className="space-y-6">
               <div className="bg-white rounded-2xl shadow-lg p-6 border border-gray-100">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold text-gray-900">Previous Tournaments</h2>
+                  <h2 className="text-xl font-bold text-gray-900">Previous Matches</h2>
                   <div className="text-sm text-gray-600">
                     Showing {((this.state.previousMatchesPage - 1) * this.state.previousMatchesPerPage) + 1}-{Math.min(this.state.previousMatchesPage * this.state.previousMatchesPerPage, this.state.previousMatches.length)} of {this.state.previousMatches.length} matches
                   </div>
@@ -8327,12 +7624,11 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       >
                         <div className="flex flex-col items-center text-center">
                           <div className="relative mb-2">
-                          <img 
-                            src={getAvatar(this.state.selectedMatch?.topPlayers?.winner?.avatar)} 
-                            alt={this.state.selectedMatch?.topPlayers?.winner?.name || 'Winner'}
-                            className="w-12 h-12 rounded-full object-cover border-2 border-yellow-400"
-                            onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
-                          />
+                            <img 
+                              src={this.state.selectedMatch?.topPlayers?.winner?.avatar || '/default-avatar.png'} 
+                              alt={this.state.selectedMatch?.topPlayers?.winner?.name || 'Winner'}
+                              className="w-12 h-12 rounded-full object-cover border-2 border-yellow-400"
+                            />
                             <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-400 rounded-full flex items-center justify-center">
                               <span className="text-xs font-bold text-white">1</span>
                             </div>
@@ -8459,10 +7755,9 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                             <div className="flex items-center justify-between mb-3">
                               <div className="relative">
                                 <img
-                                  src={getAvatar(player.profilePic)}
-                                  alt={this.getPlayerDisplayName(player)}
+                                  src={player.profilePic}
+                                  alt={player.name}
                                   className="w-10 h-10 rounded-full object-cover border-2 border-blue-400"
-                                  onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                                 />
                                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">
                                   {player.finalPosition || player.id}
@@ -8476,7 +7771,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                 {player.skill}
                               </span>
                             </div>
-                            <h3 className="font-semibold text-gray-800 mb-2">{this.getPlayerDisplayName(player)}</h3>
+                            <h3 className="font-semibold text-gray-800 mb-2">{player.name}</h3>
                             <div className="text-sm text-gray-600 space-y-1">
                               <div className="flex justify-between">
                                 <span>Email:</span>
@@ -8521,12 +7816,11 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                   >
                                     <div className="flex items-center gap-2">
                                       <img
-                                        src={getAvatar(player.profilePic)}
-                                        alt={this.getPlayerDisplayName(player)}
+                                        src={player.profilePic}
+                                        alt={player.name}
                                         className="w-6 h-6 rounded-full object-cover border border-gray-300"
-                                        onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                                       />
-                                      <span className="text-sm font-medium">{this.getPlayerDisplayName(player)}</span>
+                                      <span className="text-sm font-medium">{player.name}</span>
                                     </div>
                                     {player.finalPosition <= 2 && <span className="text-green-600 font-bold">âœ“</span>}
                                   </div>
@@ -8553,7 +7847,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                 {player.finalPosition <= 2 && (
                                   <div className="mt-2 text-center">
                                     <span className="text-xs bg-green-600 text-white px-2 py-1 rounded-full">
-                                      Winner: {this.getPlayerDisplayName(player)}
+                                      Winner: {player.name}
                                     </span>
                                   </div>
                                 )}
@@ -8588,10 +7882,10 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                       <div className="flex items-center gap-2">
                                         <img
                                           src={player.profilePic}
-                                          alt={this.getPlayerDisplayName(player)}
+                                          alt={player.name}
                                           className="w-6 h-6 rounded-full object-cover border border-gray-300"
                                         />
-                                        <span className="text-sm font-medium">{this.getPlayerDisplayName(player)}</span>
+                                        <span className="text-sm font-medium">{player.name}</span>
                                       </div>
                                       {player.finalPosition <= 2 && <span className="text-green-600 font-bold">âœ“</span>}
                                     </div>
@@ -8603,7 +7897,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                   {player.finalPosition <= 2 && (
                                     <div className="mt-2 text-center">
                                       <span className="text-xs bg-green-600 text-white px-2 py-1 rounded-full">
-                                        Winner: {this.getPlayerDisplayName(player)}
+                                        Winner: {player.name}
                                       </span>
                                     </div>
                                   )}
@@ -8638,10 +7932,10 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                       <div className="flex items-center gap-2">
                                         <img
                                           src={player.profilePic}
-                                          alt={this.getPlayerDisplayName(player)}
+                                          alt={player.name}
                                           className="w-6 h-6 rounded-full object-cover border border-gray-300"
                                         />
-                                        <span className="text-sm font-medium">{this.getPlayerDisplayName(player)}</span>
+                                        <span className="text-sm font-medium">{player.name}</span>
                                       </div>
                                       {player.finalPosition <= 4 && <span className="text-green-600 font-bold">âœ“</span>}
                                     </div>
@@ -8653,7 +7947,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                   {player.finalPosition <= 4 && (
                                     <div className="mt-2 text-center">
                                       <span className="text-xs bg-green-600 text-white px-2 py-1 rounded-full">
-                                        Winner: {this.getPlayerDisplayName(player)}
+                                        Winner: {player.name}
                                       </span>
                                     </div>
                                   )}
@@ -8688,10 +7982,10 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                       <div className="flex items-center gap-2">
                                         <img
                                           src={player.profilePic}
-                                          alt={this.getPlayerDisplayName(player)}
+                                          alt={player.name}
                                           className="w-6 h-6 rounded-full object-cover border border-gray-300"
                                         />
-                                        <span className="text-sm font-medium">{this.getPlayerDisplayName(player)}</span>
+                                        <span className="text-sm font-medium">{player.name}</span>
                                       </div>
                                       {player.finalPosition <= 2 && <span className="text-green-600 font-bold">âœ“</span>}
                                     </div>
@@ -8703,7 +7997,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                   {player.finalPosition <= 2 && (
                                     <div className="mt-2 text-center">
                                       <span className="text-xs bg-green-600 text-white px-2 py-1 rounded-full">
-                                        Winner: {this.getPlayerDisplayName(player)}
+                                        Winner: {player.name}
                                       </span>
                                     </div>
                                   )}
@@ -8746,7 +8040,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                         {player.finalPosition}
                                       </div>
                                       <div>
-                                        <p className="font-bold text-gray-800">{this.getPlayerDisplayName(player)}</p>
+                                        <p className="font-bold text-gray-800">{player.name}</p>
                                         <p className={`text-xs font-medium ${
                                           player.finalPosition === 1 ? 'text-yellow-700' :
                                           player.finalPosition === 2 ? 'text-gray-600' :
@@ -9089,9 +8383,8 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           <div className="flex items-start gap-3">
                             <div className="relative">
                               <img
-                                src={getAvatar(player.profilePic)}
-                                onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
-                                alt={this.getPlayerDisplayName(player)}
+                                src={player.profilePic}
+                                alt={player.name}
                                 className="w-16 h-16 rounded-full object-cover"
                               />
                               <div className="absolute -bottom-1 -left-1 w-6 h-6 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-bold">
@@ -9099,7 +8392,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                               </div>
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-gray-900 truncate">{this.getPlayerDisplayName(player)}</h4>
+                              <h4 className="font-semibold text-gray-900 truncate">{player.name}</h4>
                               <p className="text-sm text-gray-600 truncate">{player.email}</p>
                               <div className="flex items-center justify-between mt-2">
                                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${player.skillColor}`}>
@@ -9373,7 +8666,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     .flatMap(round => round.matches)
                     .find(match => match.id === this.state.selectedMatchForWinner);
                   return selectedMatch?.winner 
-                    ? `Current winner: ${this.getPlayerDisplayName(selectedMatch.winner)}. Choose the new winner:`
+                    ? `Current winner: ${selectedMatch.winner.name}. Choose the new winner:`
                     : 'Choose the winner of this match:';
                 })()}
               </p>
@@ -9627,7 +8920,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-4 mb-4">
                           <img 
-                            src={getAvatar(rankedWinner.player.profilePic)} 
+                            src={rankedWinner.player.profilePic || '/default-avatar.png'} 
                             alt={rankedWinner.player.name}
                             className="w-20 h-20 rounded-full object-cover border-4 border-purple-300 shadow-md"
                           />
@@ -9728,12 +9021,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
           Cancel
         </button>
         <button
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            console.log('🎯 Save Winner Titles button clicked');
-            this.saveWinnerTitles();
-          }}
+          onClick={this.saveWinnerTitles}
           className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -9815,9 +9103,9 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                 </h4>
 
                 {/* Horizontal Bracket Layout */}
-                <div className="flex flex-nowrap gap-8 overflow-x-auto pb-4 snap-x snap-mandatory">
+                <div className="flex gap-8 overflow-x-auto pb-4">
                   {this.state.rounds.map((round, roundIndex) => (
-                    <div key={round.id} className="flex-shrink-0 min-w-[300px] snap-start">
+                    <div key={round.id} className="flex-shrink-0 min-w-[300px]">
                       {/* Round Header */}
                       <div className="mb-4 sticky top-0 bg-white z-10 pb-2">
                         <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-3 rounded-lg shadow-md">
@@ -9847,44 +9135,20 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                 Match {matchIndex + 1}
                               </div>
 
-                              {(() => {
-                                // Helper function to check if winner matches a player
-                                const isWinner = (player: Player | undefined, winner: Player | undefined): boolean => {
-                                  if (!winner || !player) return false;
-                                  return (
-                                    winner.id === player.id ||
-                                    winner.customerProfileId === player.customerProfileId ||
-                                    (winner.customerProfileId && winner.customerProfileId.toString() === player.customerProfileId?.toString()) ||
-                                    (winner.id && winner.id.toString() === player.id?.toString())
-                                  );
-                                };
-                                
-                                const player1IsWinner = match.status === 'completed' && isWinner(match.player1, match.winner);
-                                const player2IsWinner = match.status === 'completed' && isWinner(match.player2, match.winner);
-                                
-                                return (
-                                  <>
                               {/* Player 1 */}
                               <div className={`flex items-center gap-3 p-3 rounded-lg mb-2 ${
-                                      player1IsWinner ? 'bg-green-100 border-2 border-green-400' : 'bg-white'
+                                match.winner && typeof match.winner === 'string' && match.winner === match.player1?.id ? 'bg-green-100 border-2 border-green-400' : 'bg-white'
                               }`}>
-                            <img 
-                              src={getAvatar(match.player1?.profilePic)} 
+                                <img 
+                                  src={match.player1?.profilePic || '/default-avatar.png'} 
                                   alt={match.player1?.name || 'Player 1'}
-                                        className={`w-12 h-12 rounded-full object-cover border-2 ${
-                                          player1IsWinner ? 'border-green-500' : 'border-gray-300'
-                                        }`}
+                                  className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
                                 />
                                 <div className="flex-1">
-                                        <div className={`font-semibold ${player1IsWinner ? 'text-green-800' : 'text-gray-900'}`}>
-                                          {match.player1?.name || 'Player 1'}
-                                          {player1IsWinner && (
-                                            <span className="ml-2 text-yellow-500">🏆</span>
-                                          )}
-                                        </div>
+                                  <div className="font-semibold text-gray-900">{match.player1?.name || 'Player 1'}</div>
                                   <div className="text-xs text-gray-600">{match.player1?.skill || 'N/A'}</div>
                                 </div>
-                                      {player1IsWinner && (
+                                {match.winner && typeof match.winner === 'string' && match.winner === match.player1?.id && (
                                   <div className="flex items-center gap-1">
                                     <svg className="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -9901,25 +9165,18 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
 
                               {/* Player 2 */}
                               <div className={`flex items-center gap-3 p-3 rounded-lg mt-2 ${
-                                      player2IsWinner ? 'bg-green-100 border-2 border-green-400' : 'bg-white'
+                                match.winner && typeof match.winner === 'string' && match.winner === match.player2?.id ? 'bg-green-100 border-2 border-green-400' : 'bg-white'
                               }`}>
                                 <img 
-                                  src={getAvatar(match.player2?.profilePic)} 
+                                  src={match.player2?.profilePic || '/default-avatar.png'} 
                                   alt={match.player2?.name || 'Player 2'}
-                                        className={`w-12 h-12 rounded-full object-cover border-2 ${
-                                          player2IsWinner ? 'border-green-500' : 'border-gray-300'
-                                        }`}
+                                  className="w-12 h-12 rounded-full object-cover border-2 border-gray-300"
                                 />
                                 <div className="flex-1">
-                                        <div className={`font-semibold ${player2IsWinner ? 'text-green-800' : 'text-gray-900'}`}>
-                                          {match.player2?.name || 'Player 2'}
-                                          {player2IsWinner && (
-                                            <span className="ml-2 text-yellow-500">🏆</span>
-                                          )}
-                                        </div>
+                                  <div className="font-semibold text-gray-900">{match.player2?.name || 'Player 2'}</div>
                                   <div className="text-xs text-gray-600">{match.player2?.skill || 'N/A'}</div>
                                 </div>
-                                      {player2IsWinner && (
+                                {match.winner && typeof match.winner === 'string' && match.winner === match.player2?.id && (
                                   <div className="flex items-center gap-1">
                                     <svg className="w-6 h-6 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
@@ -9928,9 +9185,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                   </div>
                                 )}
                               </div>
-                                  </>
-                                );
-                              })()}
 
                               {/* Match Status */}
                               <div className="mt-2 text-center">
@@ -9969,12 +9223,12 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                                   #{index + 1}
                                 </div>
                                 <img 
-                                  src={getAvatar(winner.profilePic)} 
-                                  alt={this.getPlayerDisplayName(winner)}
+                                  src={winner.profilePic || '/default-avatar.png'} 
+                                  alt={winner.name}
                                   className="w-10 h-10 rounded-full object-cover border-2 border-yellow-400"
                                 />
                                 <div className="flex-1">
-                                  <div className="font-semibold text-gray-900">{this.getPlayerDisplayName(winner)}</div>
+                                  <div className="font-semibold text-gray-900">{winner.name}</div>
                                   <div className="text-xs text-gray-600">{winner.skill || 'N/A'}</div>
                                 </div>
                               </div>
@@ -9989,29 +9243,14 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
 
               {/* Final Top Winners Section - Display Selected Winners from WinnersToDisplay */}
               {(() => {
-                console.log('🏆 Final Winners Section - Checking winnersToDisplay:', {
-                  total: this.state.winnersToDisplay.length,
-                  winners: this.state.winnersToDisplay.map(w => ({
-                    name: w.player?.name,
-                    selected: w.selected,
-                    title: w.title
-                  }))
-                });
-                
                 // Use winnersToDisplay array (most recent round only for each player) - filter only selected winners
-                const selectedWinners = this.state.winnersToDisplay.filter(winner => winner.selected !== false); // Include all if selected is not explicitly false
-                console.log('🏆 Selected winners after filter:', selectedWinners.length);
-                
-                // Sort by rank to maintain the order set in the modal
-                const sortedWinners = selectedWinners.sort((a, b) => (a.rank || 0) - (b.rank || 0));
-                const topWinners = sortedWinners.slice(0, 5).map((winner) => ({
+                const selectedWinners = this.state.winnersToDisplay.filter(winner => winner.selected);
+                const topWinners = selectedWinners.slice(0, 5).map((winner, index) => ({
                   player: winner.player,
-                  rank: winner.rank || 1, // Use the saved rank, not index
-                  title: winner.title || '', // Use the saved title
-                  roundWon: winner.roundWon || ''
+                  rank: index + 1,
+                  title: winner.title,
+                  roundWon: winner.roundWon
                 }));
-                
-                console.log('🏆 Top winners to display:', topWinners.length, topWinners.map(w => w.player?.name));
                 
                 if (topWinners.length > 0) {
                   return (
@@ -10038,20 +9277,17 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                             }`}
                           >
                             {/* Rank Badge */}
-                            <div className="absolute -top-5 -right-5 w-16 h-16 bg-white rounded-full shadow-xl flex items-center justify-center border-8 border-current">
-                              <span className="text-3xl font-extrabold leading-none">
-                                {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}
-                              </span>
+                            <div className="absolute -top-4 -right-4 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center border-4 border-current">
+                              <span className="text-2xl font-bold">{index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${index + 1}`}</span>
                             </div>
                             
                             {/* Winner Info */}
                             <div className="text-center">
-                                <img 
-                                  src={getAvatar(rankedWinner.player.profilePic)} 
-                                  alt={rankedWinner.player.name}
-                                  className="w-32 h-32 mx-auto rounded-full object-cover border-4 border-white shadow-lg mb-4"
-                                  onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
-                                />
+                              <img 
+                                src={rankedWinner.player.profilePic || '/default-avatar.png'} 
+                                alt={rankedWinner.player.name}
+                                className="w-32 h-32 mx-auto rounded-full object-cover border-4 border-white shadow-lg mb-4"
+                              />
                               <h4 className="text-xl font-bold text-gray-900 mb-1">{rankedWinner.player.name}</h4>
                               <p className="text-sm text-gray-700 mb-2">{rankedWinner.player.email}</p>
                               
@@ -10069,25 +9305,25 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                               
                               {/* Title */}
                               {rankedWinner.title ? (
-                                <div className="mt-3 text-2xl font-extrabold text-gray-900 bg-white bg-opacity-70 rounded-lg py-3 px-4">
+                                <div className="mt-3 text-xl font-bold text-gray-900 bg-white bg-opacity-60 rounded-lg py-2 px-3">
                                   {rankedWinner.title}
                                 </div>
                               ) : (
                                 <>
                                   {index === 0 && (
-                                    <div className="mt-3 text-3xl font-extrabold text-yellow-800">Champion</div>
+                                    <div className="mt-3 text-2xl font-bold text-yellow-800">Champion</div>
                                   )}
                                   {index === 1 && (
-                                    <div className="mt-3 text-2xl font-extrabold text-gray-800">Runner-up</div>
+                                    <div className="mt-3 text-xl font-bold text-gray-800">Runner-up</div>
                                   )}
                                   {index === 2 && (
-                                    <div className="mt-3 text-2xl font-extrabold text-orange-800">3rd Place</div>
+                                    <div className="mt-3 text-lg font-bold text-orange-800">3rd Place</div>
                                   )}
                                   {index === 3 && (
-                                    <div className="mt-3 text-xl font-extrabold text-blue-800">4th Place</div>
+                                    <div className="mt-3 text-lg font-bold text-blue-800">4th Place</div>
                                   )}
                                   {index === 4 && (
-                                    <div className="mt-3 text-xl font-extrabold text-green-800">5th Place</div>
+                                    <div className="mt-3 text-lg font-bold text-green-800">5th Place</div>
                                   )}
                                 </>
                               )}
@@ -10138,10 +9374,10 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
 {this.state.rounds.length > 0 && (
   <div className="mt-8">
     {/* Tab Navigation */}
-    <div className="border-b border-gray-200 overflow-x-auto">
-      <nav className="-mb-px flex flex-nowrap space-x-6 pb-2">
+    <div className="border-b border-gray-200">
+      <nav className="-mb-px flex space-x-6">
         {this.state.rounds.map((round, index) => (
-          <div key={round.id} className="flex flex-col flex-shrink-0 min-w-[340px]">
+          <div key={round.id} className="flex flex-col">
            {/* Round Group Header */}
 <div className="text-xs text-gray-500 font-medium mb-1 text-center flex items-center justify-center gap-2">
   {this.state.editingRoundId === round.id ? (
@@ -10500,7 +9736,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     <div className="w-16 h-16 mx-auto mb-3 bg-green-100 rounded-full flex items-center justify-center relative">
                       <img 
                         src={winner.profilePic} 
-                        alt={this.getPlayerDisplayName(winner)}
+                        alt={winner.name}
                         className="w-14 h-14 rounded-full object-cover"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
@@ -10524,7 +9760,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                       )}
                     </div>
                     <h4 className={`font-semibold mb-1 ${winner.selected ? 'text-blue-900' : 'text-green-900'}`}>
-                      {this.getPlayerDisplayName(winner)}
+                      {winner.name}
                     </h4>
                     <p className={`text-sm mb-2 ${winner.selected ? 'text-blue-700' : 'text-green-700'}`}>
                       {winner.skill}
@@ -10802,16 +10038,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
             </optgroup>
           </select>
               <button
-            onClick={async (e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log('🖱️ Move Selected button clicked!', {
-                activeRoundId: activeRound.id,
-                selectedRoundId: this.state.selectedRoundId,
-                selectedPlayersCount: activeRound.players.filter(p => p.selected).length
-              });
-              await this.moveSelectedPlayersFromRound(activeRound.id);
-            }}
+            onClick={() => this.moveSelectedPlayersFromRound(activeRound.id)}
             
             className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
@@ -10834,7 +10061,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
   
   // Determine button label and styling
   const isStartMatch = unmatchedCount === 2;
-  const buttonLabel = isStartMatch ? 'Setup Match' : 'Shuffle';
+  const buttonLabel = isStartMatch ? 'Start Match' : 'Shuffle';
   
   // Only show button if there are at least 2 players and round is not frozen
   if (activeRound.players.length >= 2 && !activeRound.isFrozen) {
@@ -10951,38 +10178,20 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
               </span>
             </div>
             <div className="flex items-center justify-between">
-              {(() => {
-                // Helper function to check if winner matches a player
-                const isWinner = (player: Player, winner: Player | undefined): boolean => {
-                  if (!winner) return false;
-                  return (
-                    winner.id === player.id ||
-                    winner.customerProfileId === player.customerProfileId ||
-                    (winner.customerProfileId && winner.customerProfileId.toString() === player.customerProfileId?.toString()) ||
-                    (winner.id && winner.id.toString() === player.id?.toString())
-                  );
-                };
-                
-                const player1IsWinner = match.status === 'completed' && isWinner(match.player1, match.winner);
-                const player2IsWinner = match.status === 'completed' && isWinner(match.player2, match.winner);
-                
-                return (
-                  <>
-                    <div className={`flex items-center space-x-3 flex-1 ${player1IsWinner ? 'bg-green-50 border-2 border-green-300 rounded-lg p-2' : ''}`}>
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center overflow-hidden relative ${player1IsWinner ? 'bg-green-400' : 'bg-gray-300'}`}>
+              <div className={`flex items-center space-x-3 flex-1 ${match.status === 'completed' && match.winner?.id === match.player1.id ? 'bg-green-50 border-2 border-green-300 rounded-lg p-2' : ''}`}>
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center overflow-hidden relative ${match.status === 'completed' && match.winner?.id === match.player1.id ? 'bg-green-400' : 'bg-gray-300'}`}>
                   {match.player1.profilePic ? (
                     <img 
-                      src={getAvatar(match.player1.profilePic)} 
-                      alt={this.getPlayerDisplayName(match.player1)}
+                      src={match.player1.profilePic} 
+                      alt={match.player1.name}
                       className="w-full h-full object-cover rounded-full"
-                      onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                     />
                   ) : (
                     <span className="text-lg font-medium text-gray-600">
                       {match.player1.name.charAt(0).toUpperCase()}
                     </span>
                   )}
-                        {player1IsWinner && (
+                  {match.status === 'completed' && match.winner?.id === match.player1.id && (
                     <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                       <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -10991,9 +10200,9 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                   )}
                 </div>
                 <div>
-                        <p className={`font-medium ${player1IsWinner ? 'text-green-800' : 'text-gray-900'}`}>
-                    {this.getPlayerDisplayName(match.player1)}
-                          {player1IsWinner && (
+                  <p className={`font-medium ${match.status === 'completed' && match.winner?.id === match.player1.id ? 'text-green-800' : 'text-gray-900'}`}>
+                    {match.player1.name}
+                    {match.status === 'completed' && match.winner?.id === match.player1.id && (
                       <span className="ml-2 text-green-600">🏆</span>
                     )}
                   </p>
@@ -11005,30 +10214,29 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                 <span className="text-gray-600 font-medium text-sm">VS</span>
               </div>
               
-                    <div className={`flex items-center space-x-3 flex-1 justify-end ${player2IsWinner ? 'bg-green-50 border-2 border-green-300 rounded-lg p-2' : ''}`}>
+              <div className={`flex items-center space-x-3 flex-1 justify-end ${match.status === 'completed' && match.winner?.id === match.player2.id ? 'bg-green-50 border-2 border-green-300 rounded-lg p-2' : ''}`}>
                 <div className="text-right">
-                        <p className={`font-medium ${player2IsWinner ? 'text-green-800' : 'text-gray-900'}`}>
-                    {this.getPlayerDisplayName(match.player2)}
-                          {player2IsWinner && (
+                  <p className={`font-medium ${match.status === 'completed' && match.winner?.id === match.player2.id ? 'text-green-800' : 'text-gray-900'}`}>
+                    {match.player2.name}
+                    {match.status === 'completed' && match.winner?.id === match.player2.id && (
                       <span className="ml-2 text-green-600">🏆</span>
                     )}
                   </p>
                   <p className="text-xs text-gray-500">{match.player2.skill}</p>
                 </div>
-                      <div className={`w-16 h-16 rounded-full flex items-center justify-center overflow-hidden relative ${player2IsWinner ? 'bg-green-400' : 'bg-gray-300'}`}>
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center overflow-hidden relative ${match.status === 'completed' && match.winner?.id === match.player2.id ? 'bg-green-400' : 'bg-gray-300'}`}>
                   {match.player2.profilePic ? (
                     <img 
-                      src={getAvatar(match.player2.profilePic)} 
-                      alt={this.getPlayerDisplayName(match.player2)}
+                      src={match.player2.profilePic} 
+                      alt={match.player2.name}
                       className="w-full h-full object-cover rounded-full"
-                      onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                     />
                   ) : (
                     <span className="text-lg font-medium text-gray-600">
                       {match.player2.name.charAt(0).toUpperCase()}
                     </span>
                   )}
-                        {player2IsWinner && (
+                  {match.status === 'completed' && match.winner?.id === match.player2.id && (
                     <div className="absolute -top-1 -right-1 w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
                       <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -11037,9 +10245,6 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                   )}
                 </div>
               </div>
-                  </>
-                );
-              })()}
             </div>
             
             {/* Match Control Buttons */}
@@ -11146,10 +10351,9 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                   <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
                     {player.profilePic ? (
                       <img 
-                        src={getAvatar(player.profilePic)} 
-                        alt={this.getPlayerDisplayName(player)}
+                        src={player.profilePic} 
+                        alt={player.name}
                         className="w-full h-full object-cover rounded-full"
-                        onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
                       />
                     ) : (
                       <span className="text-sm font-medium text-gray-600">
@@ -11158,7 +10362,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{this.getPlayerDisplayName(player)}</p>
+                    <p className="font-medium text-gray-900 truncate">{player.name}</p>
                     <p className="text-xs text-gray-500">{player.skill}</p>
                     {player.isPreviousRoundWinner && player.originalWinnerRoundId && (() => {
                       const winningRound = this.state.rounds.find(r => r.id === player.originalWinnerRoundId);
@@ -11193,16 +10397,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     ))}
                   </select>
                   <button
-                    onClick={async (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      console.log('🖱️ Move button clicked (unmatched players)!', {
-                        activeRoundId: activeRound.id,
-                        selectedRoundId: this.state.selectedRoundId,
-                        selectedPlayersCount: unmatchedPlayers.filter(p => p.selected).length
-                      });
-                      await this.moveSelectedPlayersFromRound(activeRound.id);
-                    }}
+                    onClick={() => this.moveSelectedPlayersFromRound(activeRound.id)}
                     disabled={!this.state.selectedRoundId}
                     className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -11298,10 +10493,9 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
           <div className="w-10 h-10 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
             {player.profilePic ? (
               <img 
-                src={getAvatar(player.profilePic)}
-                alt={this.getPlayerDisplayName(player)}
+                src={player.profilePic} 
+                alt={player.name}
                 className="w-full h-full object-cover rounded-full"
-                onError={(e) => { e.currentTarget.src = DEFAULT_AVATAR; }}
               />
             ) : (
               <span className="text-sm font-medium text-gray-600">
@@ -11310,7 +10504,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-gray-900 truncate">{this.getPlayerDisplayName(player)}</p>
+            <p className="font-medium text-gray-900 truncate">{player.name}</p>
             <p className="text-xs text-gray-500">{player.skill}</p>
           </div>
         </div>
