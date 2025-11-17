@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "start": "vite preview",
+    "start": "node server.js",
     "dev": "vite",
     "build": "vite build",
     "build:check": "tsc && vite build",
