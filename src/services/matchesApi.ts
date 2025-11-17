@@ -114,8 +114,19 @@ export interface TournamentResponse {
 
 class MatchesApiService {
   private baseUrl = '/api/matches';
-  // Default to port 3005 as per Postman collection, but allow override via env variable
-  private apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3005/api/v1';
+  // Determine API base URL
+  // Use relative path to leverage proxy (Vite in dev, server.js in production)
+  // Only use full URL if explicitly set via environment variable
+  private getApiBaseUrl(): string {
+    const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+    if (envUrl) {
+      return envUrl;
+    }
+    // Use relative path - will be proxied by Vite (dev) or server.js (production)
+    return '/api/v1';
+  }
+  
+  private apiBaseUrl = this.getApiBaseUrl();
 
   // Simulate API delay
   private delay(ms: number = 500): Promise<void> {
@@ -125,7 +136,7 @@ class MatchesApiService {
   // Fetch scheduled matches
   async getScheduledMatches(): Promise<MatchesResponse> {
     await this.delay(300);
-    const response = await fetch('/src/data/scheduled-matches.json');
+    const response = await fetch('/data/scheduled-matches.json');
     if (!response.ok) {
       throw new Error('Failed to fetch scheduled matches');
     }
@@ -135,7 +146,7 @@ class MatchesApiService {
   // Fetch previous matches
   async getPreviousMatches(): Promise<MatchesResponse> {
     await this.delay(300);
-    const response = await fetch('/src/data/previous-matches.json');
+    const response = await fetch('/data/previous-matches.json');
     if (!response.ok) {
       throw new Error('Failed to fetch previous matches');
     }
@@ -145,7 +156,7 @@ class MatchesApiService {
   // Fetch match details by ID
   async getMatchDetails(matchId: number): Promise<Match> {
     await this.delay(200);
-    const response = await fetch(`/src/data/previous-matches.json`);
+    const response = await fetch(`/data/previous-matches.json`);
     if (!response.ok) {
       throw new Error('Failed to fetch match details');
     }

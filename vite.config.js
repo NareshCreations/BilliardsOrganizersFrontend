@@ -7,7 +7,16 @@ export default defineConfig({
   server: {
     host: process.env.HOST || '0.0.0.0',
     port: process.env.PORT ? parseInt(process.env.PORT) : 3000,
-    open: false
+    open: false,
+    proxy: {
+      '/api': {
+        target: 'http://localhost:3005',
+        changeOrigin: true,
+        secure: false,
+        // Keep the /api prefix when forwarding
+        rewrite: (path) => path
+      }
+    }
   },
   resolve: {
     alias: {

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import compression from 'compression';
 import { readFileSync } from 'fs';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -16,6 +17,10 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3000;
 const NODE_ENV = process.env.NODE_ENV || 'production';
+
+// Get API base URL from environment variable
+// In production, this should be set to your backend API URL
+const API_BASE_URL = process.env.VITE_API_BASE_URL || process.env.API_BASE_URL || 'http://localhost:3005/api/v1';
 
 // Enable compression for better performance
 app.use(compression());
@@ -31,9 +36,11 @@ app.use((req, res, next) => {
   // Referrer policy
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   // Content Security Policy (adjust as needed for your app)
+  // Allow connections to API and same origin
+  const apiOrigin = new URL(API_BASE_URL).origin;
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https:;"
+    `default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' ${apiOrigin} https:;`
   );
   next();
 });
@@ -56,12 +63,45 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API proxy (if needed - uncomment and configure if you want to proxy API requests)
-// app.use('/api', (req, res) => {
-//   const apiUrl = process.env.VITE_API_BASE_URL || 'http://localhost:3005/api/v1';
-//   // Implement your API proxy logic here
-//   res.status(501).json({ message: 'API proxy not configured' });
-// });
+// API proxy - forward API requests to backend
+// This helps avoid CORS issues in production
+let apiProxyTarget = 'http://localhost:3005';
+
+// Parse API_BASE_URL to get the target server
+if (API_BASE_URL && API_BASE_URL.startsWith('http')) {
+  try {
+    const apiUrl = new URL(API_BASE_URL);
+    apiProxyTarget = `${apiUrl.protocol}//${apiUrl.host}`;
+    console.log(`🔗 API Base URL configured: ${API_BASE_URL}`);
+    console.log(`🔗 Proxy target: ${apiProxyTarget}`);
+  } catch (e) {
+    console.warn('⚠️ Invalid API_BASE_URL format, using default localhost:3005');
+  }
+}
+
+console.log(`🔗 Setting up API proxy: /api -> ${apiProxyTarget}`);
+
+app.use('/api', createProxyMiddleware({
+  target: apiProxyTarget,
+  changeOrigin: true,
+  secure: false, // Allow self-signed certificates in development
+  pathRewrite: {
+    '^/api': '/api', // Keep /api in the path
+  },
+  onProxyReq: (proxyReq, req, res) => {
+    console.log(`🔄 Proxying ${req.method} ${req.url} to ${apiProxyTarget}${req.url}`);
+  },
+  onError: (err, req, res) => {
+    console.error('❌ Proxy error:', err.message);
+    if (!res.headersSent) {
+      res.status(503).json({ 
+        error: 'Service Unavailable', 
+        message: `Backend API is not available at ${apiProxyTarget}. Please ensure the backend server is running.` 
+      });
+    }
+  },
+  logLevel: 'info'
+}));
 
 // Handle SPA routing - all routes fallback to index.html
 app.get('*', (req, res, next) => {

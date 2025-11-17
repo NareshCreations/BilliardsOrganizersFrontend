@@ -3,9 +3,21 @@
  * Centralized configuration for authentication settings
  */
 
+// Determine API base URL
+// Use relative path to leverage proxy (Vite in dev, server.js in production)
+// Only use full URL if explicitly set via environment variable
+const getApiBaseUrl = (): string => {
+  const envUrl = (import.meta as any).env?.VITE_API_BASE_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+  // Use relative path - will be proxied by Vite (dev) or server.js (production)
+  return '/api/v1';
+};
+
 export const AUTH_CONFIG = {
   // API endpoints
-  API_BASE_URL: (import.meta as any).env?.VITE_API_BASE_URL || 'http://localhost:3005/api/v1',
+  API_BASE_URL: getApiBaseUrl(),
 
   // Token storage keys
   TOKEN_KEY: 'billiards_auth_token',
