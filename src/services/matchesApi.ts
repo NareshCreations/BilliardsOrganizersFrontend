@@ -125,7 +125,7 @@ class MatchesApiService {
   // Fetch scheduled matches
   async getScheduledMatches(): Promise<MatchesResponse> {
     await this.delay(300);
-    const response = await fetch('/src/data/scheduled-matches.json');
+    const response = await fetch('/data/scheduled-matches.json');
     if (!response.ok) {
       throw new Error('Failed to fetch scheduled matches');
     }
@@ -135,7 +135,7 @@ class MatchesApiService {
   // Fetch previous matches
   async getPreviousMatches(): Promise<MatchesResponse> {
     await this.delay(300);
-    const response = await fetch('/src/data/previous-matches.json');
+    const response = await fetch('/data/previous-matches.json');
     if (!response.ok) {
       throw new Error('Failed to fetch previous matches');
     }
@@ -145,7 +145,7 @@ class MatchesApiService {
   // Fetch match details by ID
   async getMatchDetails(matchId: number): Promise<Match> {
     await this.delay(200);
-    const response = await fetch(`/src/data/previous-matches.json`);
+    const response = await fetch(`/data/previous-matches.json`);
     if (!response.ok) {
       throw new Error('Failed to fetch match details');
     }

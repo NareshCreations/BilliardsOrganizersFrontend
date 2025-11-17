@@ -1,0 +1,47 @@
+{
+  "matches": [
+    {
+      "id": 1,
+      "name": "9-Ball Championship",
+      "gameType": "9-ball",
+      "organizerName": "Rajesh Tournament Director",
+      "organizerDescription": "Professional tournament organizer with 15+ years experience",
+      "date": "2025-10-15",
+      "time": "14:00",
+      "status": "scheduled",
+      "players": 13,
+      "maxPlayers": 50,
+      "entryFee": 50,
+      "venue": "Delhi Sports Complex - Main Branch",
+      "location": {
+        "id": 1,
+        "name": "Delhi Sports Complex - Main Branch",
+        "address": "123 Sports Avenue, New Delhi, India",
+        "coordinates": { "lat": 28.6139, "lng": 77.2090 },
+        "amenities": ["Parking", "Food Court", "Restrooms", "WiFi"]
+      },
+      "ballRules": "lastball-yes-ballinhand-yes",
+      "registeredPlayers": [
+        { "id": 1, "name": "Rajesh Kumar", "email": "rajesh@email.com", "skill": "Advanced", "registeredAt": "2025-10-01", "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face", "rank": 1, "rating": 2250 },
+        { "id": 2, "name": "Priya Sharma", "email": "priya@email.com", "skill": "Intermediate", "registeredAt": "2025-10-02", "profilePic": "https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face", "rank": 20, "rating": 1380 },
+        { "id": 3, "name": "Amit Patel", "email": "amit@email.com", "skill": "Expert", "registeredAt": "2025-10-03", "profilePic": "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face", "rank": 4, "rating": 2100 },
+        { "id": 4, "name": "Sneha Reddy", "email": "sneha@email.com", "skill": "Pro", "registeredAt": "2025-10-04", "profilePic": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face", "rank": 19, "rating": 1450 },
+        { "id": 5, "name": "Vikram Singh", "email": "vikram@email.com", "skill": "Advanced", "registeredAt": "2025-10-05", "profilePic": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face", "rank": 2, "rating": 2200 },
+        { "id": 6, "name": "Ananya Gupta", "email": "ananya@email.com", "skill": "Intermediate", "registeredAt": "2025-10-06", "profilePic": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face", "rank": 18, "rating": 1500 },
+        { "id": 7, "name": "Rohit Verma", "email": "rohit@email.com", "skill": "Expert", "registeredAt": "2025-10-07", "profilePic": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop&crop=face", "rank": 3, "rating": 2150 },
+        { "id": 8, "name": "Kavya Nair", "email": "kavya@email.com", "skill": "Pro", "registeredAt": "2025-10-08", "profilePic": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face", "rank": 17, "rating": 1550 },
+        { "id": 9, "name": "Arjun Mehta", "email": "arjun@email.com", "skill": "Advanced", "registeredAt": "2025-10-09", "profilePic": "https://images.unsplash.com/photo-1519345182560-3f2917c472ef?w=150&h=150&fit=crop&crop=face", "rank": 5, "rating": 2050 },
+        { "id": 10, "name": "Isha Joshi", "email": "isha@email.com", "skill": "Intermediate", "registeredAt": "2025-10-10", "profilePic": "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=150&h=150&fit=crop&crop=face", "rank": 16, "rating": 1600 },
+        { "id": 11, "name": "Deepak Kumar", "email": "deepak@email.com", "skill": "Expert", "registeredAt": "2025-10-11", "profilePic": "https://images.unsplash.com/photo-1507591064344-4c6ce005b128?w=150&h=150&fit=crop&crop=face", "rank": 6, "rating": 2000 },
+        { "id": 12, "name": "Meera Iyer", "email": "meera@email.com", "skill": "Pro", "registeredAt": "2025-10-12", "profilePic": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=150&h=150&fit=crop&crop=face", "rank": 15, "rating": 1650 },
+        { "id": 13, "name": "Suresh Rao", "email": "suresh@email.com", "skill": "Advanced", "registeredAt": "2025-10-13", "profilePic": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face", "rank": 7, "rating": 1950 }
+      ],
+      "notifiedUsers": {
+        "type": "all",
+        "count": 3,
+        "users": [],
+        "message": "Join our exciting 9-Ball Championship!"
+      }
+    }
+  ]
+}
