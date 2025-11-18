@@ -85,12 +85,15 @@ export interface LoginResponse {
 }
 
 export interface RegisterRequest {
-  email: string;
+  identifier: string; // email, phone, or org_id
+  identifierType: 'email' | 'phone' | 'org_id';
   password: string;
+  confirmPassword: string;
   firstName: string;
   lastName: string;
-  phone: string;
-  dateOfBirth: string;
+  email?: string; // Optional, but should match identifier if identifierType is 'email'
+  phone?: string; // Optional, but should match identifier if identifierType is 'phone'
+  dateOfBirth?: string; // Optional
 }
 
 export interface RegisterResponse {
@@ -135,7 +138,10 @@ class ApiService {
     };
 
     try {
-      console.log('Making API request to:', url);
+      console.log('🌐 Making API request to:', url);
+      console.log('🌐 Request method:', config.method || 'GET');
+      console.log('🌐 Request headers:', config.headers);
+      console.log('🌐 Request body:', config.body);
       const response = await fetch(url, config);
       
       if (!response.ok) {
@@ -176,6 +182,8 @@ class ApiService {
   }
 
   async register(userData: RegisterRequest): Promise<ApiResponse<RegisterResponse>> {
+    console.log('📤 API Service - Register request data:', userData);
+    console.log('📤 API Service - Register request JSON:', JSON.stringify(userData));
     return this.request<RegisterResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(userData),

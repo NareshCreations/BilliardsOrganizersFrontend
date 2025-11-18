@@ -5,6 +5,8 @@ import { apiService } from '../../services/api';
 
 interface SignupState {
   formData: {
+    identifierType: 'email' | 'org_id';
+    identifier: string; // email or org_id based on identifierType
     firstName: string;
     lastName: string;
     email: string;
@@ -31,6 +33,8 @@ class Signup extends Component<any, SignupState> {
     super(props);
     this.state = {
       formData: {
+        identifierType: 'email',
+        identifier: '',
         firstName: '',
         lastName: '',
         email: '',
@@ -45,14 +49,31 @@ class Signup extends Component<any, SignupState> {
     };
   }
 
-  handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
-    this.setState(prevState => ({
-      formData: {
+  handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type } = e.target;
+    const checked = (e.target as HTMLInputElement).checked;
+    
+    this.setState(prevState => {
+      const newFormData = {
         ...prevState.formData,
         [name]: type === 'checkbox' ? checked : value
+      };
+      
+      // If identifierType changes, update identifier field
+      if (name === 'identifierType') {
+        newFormData.identifier = '';
+        if (value === 'email') {
+          newFormData.identifier = prevState.formData.email;
+        }
       }
-    }));
+      
+      // If identifierType is email and email changes, update identifier
+      if (name === 'email' && prevState.formData.identifierType === 'email') {
+        newFormData.identifier = value;
+      }
+      
+      return { formData: newFormData };
+    });
     
     // Clear error when user starts typing
     if (this.state.errors[name]) {
@@ -73,6 +94,20 @@ class Signup extends Component<any, SignupState> {
       newErrors.lastName = 'Last name is required';
     }
 
+    // Validate identifier based on type
+    if (!this.state.formData.identifier.trim()) {
+      if (this.state.formData.identifierType === 'email') {
+        newErrors.identifier = 'Email is required';
+      } else {
+        newErrors.identifier = 'Organization ID is required';
+      }
+    } else if (this.state.formData.identifierType === 'email') {
+      if (!/\S+@\S+\.\S+/.test(this.state.formData.identifier)) {
+        newErrors.identifier = 'Email is invalid';
+      }
+    }
+
+    // Email is still required for both types
     if (!this.state.formData.email) {
       newErrors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(this.state.formData.email)) {
@@ -122,14 +157,40 @@ class Signup extends Component<any, SignupState> {
       });
       
       // Call the real registration API
-      const response = await apiService.register({
-        email: this.state.formData.email,
+      // Determine identifier type based on what user provided
+      // For signup form, we'll use email as identifier
+      
+      // Validate all required fields are present
+      if (!this.state.formData.identifier || !this.state.formData.password || 
+          !this.state.formData.confirmPassword || !this.state.formData.firstName || 
+          !this.state.formData.lastName) {
+        this.setState({
+          errors: {
+            general: 'All required fields must be filled'
+          }
+        });
+        this.setState({ isLoading: false });
+        return;
+      }
+      
+      const registrationData = {
+        identifier: this.state.formData.identifier.trim(),
+        identifierType: this.state.formData.identifierType,
         password: this.state.formData.password,
-        firstName: this.state.formData.firstName,
-        lastName: this.state.formData.lastName,
-        phone: this.state.formData.phone,
+        confirmPassword: this.state.formData.confirmPassword,
+        firstName: this.state.formData.firstName.trim(),
+        lastName: this.state.formData.lastName.trim(),
+        email: this.state.formData.email.trim(),
+        phone: this.state.formData.phone?.trim() || '',
         dateOfBirth: '1990-01-01' // Default date, could be made configurable
-      });
+      };
+      
+      console.log('📤 Sending registration request with data:', registrationData);
+      console.log('📤 Registration data keys:', Object.keys(registrationData));
+      console.log('📤 Registration data values:', Object.values(registrationData));
+      console.log('📤 Registration data JSON stringified:', JSON.stringify(registrationData));
+      
+      const response = await apiService.register(registrationData);
       
       console.log('Registration API Response:', response);
       
@@ -216,6 +277,43 @@ class Signup extends Component<any, SignupState> {
 
             {/* Form */}
             <form onSubmit={this.handleSubmit} className={styles.form}>
+            {/* Identifier Type Dropdown */}
+            <div className={styles.formGroup}>
+              <label htmlFor="identifierType" className={styles.label}>
+                Register As
+              </label>
+              <select
+                id="identifierType"
+                name="identifierType"
+                value={formData.identifierType}
+                onChange={this.handleInputChange}
+                className={`${styles.input} ${errors.identifierType ? styles.inputError : ''}`}
+                disabled={isLoading}
+              >
+                <option value="email">Email</option>
+                <option value="org_id">Organization ID</option>
+              </select>
+              {errors.identifierType && <span className={styles.errorText}>{errors.identifierType}</span>}
+            </div>
+
+            {/* Identifier Input (Email or Org ID) */}
+            <div className={styles.formGroup}>
+              <label htmlFor="identifier" className={styles.label}>
+                {formData.identifierType === 'email' ? 'Email Address' : 'Organization ID'}
+              </label>
+              <input
+                type={formData.identifierType === 'email' ? 'email' : 'text'}
+                id="identifier"
+                name="identifier"
+                value={formData.identifier}
+                onChange={this.handleInputChange}
+                className={`${styles.input} ${errors.identifier ? styles.inputError : ''}`}
+                placeholder={formData.identifierType === 'email' ? 'john@example.com' : 'ORG001'}
+                disabled={isLoading}
+              />
+              {errors.identifier && <span className={styles.errorText}>{errors.identifier}</span>}
+            </div>
+
             <div className={styles.nameRow}>
               <div className={styles.formGroup}>
                 <label htmlFor="firstName" className={styles.label}>
@@ -252,16 +350,17 @@ class Signup extends Component<any, SignupState> {
               </div>
             </div>
 
+            {/* Email field - always required but may be different from identifier */}
             <div className={styles.formGroup}>
               <label htmlFor="email" className={styles.label}>
-                Email Address
+                Email Address {formData.identifierType === 'org_id' && '(Required)'}
               </label>
               <input
                 type="email"
                 id="email"
                 name="email"
                 value={formData.email}
-                  onChange={this.handleInputChange}
+                onChange={this.handleInputChange}
                 className={`${styles.input} ${errors.email ? styles.inputError : ''}`}
                 placeholder="john@example.com"
                 disabled={isLoading}
