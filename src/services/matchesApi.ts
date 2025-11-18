@@ -665,6 +665,118 @@ class MatchesApiService {
     }
   }
 
+  // Update Round API
+  // PUT /api/v1/organizers/tournaments/{tournament_id}/rounds/{round_id}
+  // Requires Authorization Bearer token in header
+  async updateRound(tournamentId: string, roundId: string, roundData: {
+    roundName?: string;
+    roundDisplayName?: string;
+    status?: 'pending' | 'active' | 'completed';
+    isFreezed?: boolean;
+    matches?: Array<{
+      id?: string; // Optional - if provided, updates existing match; if not, creates new match
+      player1Id: string; // Required - customer_profile ID or user ID
+      player2Id: string; // Required - customer_profile ID or user ID
+      matchNumber?: number;
+      status?: 'scheduled' | 'ongoing' | 'completed' | 'cancelled';
+      winnerId?: string;
+      scorePlayer1?: number;
+      scorePlayer2?: number;
+      startTime?: string;
+      endTime?: string;
+      tableNumber?: number;
+    }>;
+    deleteMatchIds?: string[];
+  }): Promise<any> {
+    try {
+      console.log('🔄 Calling update round API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      console.log('🎯 Round ID:', roundId);
+      console.log('📋 Round Data:', roundData);
+      
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/rounds/${roundId}`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: PUT');
+      console.log('🔐 Using Authorization Bearer token from authService');
+      console.log('📦 Request payload:', JSON.stringify(roundData, null, 2));
+      
+      // Validate URL and IDs
+      if (!tournamentId || !roundId) {
+        throw new Error(`Invalid parameters: tournamentId=${tournamentId}, roundId=${roundId}`);
+      }
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(roundData),
+      });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        console.log('❌ Unauthorized request (401), token expired or invalid');
+        console.log('🔐 Logging out user and redirecting to login page...');
+        authService.logout();
+        window.location.href = '/login';
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+        console.error('❌ Response status:', response.status);
+        console.error('❌ Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        // Check if response is HTML (server error page)
+        const contentType = response.headers.get('content-type') || '';
+        const isHtml = contentType.includes('text/html') || errorText.trim().startsWith('<!DOCTYPE') || errorText.trim().startsWith('<html') || errorText.includes('<title>');
+        
+        let errorMessage: string;
+        
+        if (isHtml) {
+          // Try to extract error message from HTML
+          const match = errorText.match(/<pre[^>]*>([^<]+)<\/pre>/i) || errorText.match(/Cannot (PUT|POST|GET|DELETE)[^\n]*/i);
+          if (match) {
+            errorMessage = match[1] || match[0];
+            console.error('❌ Extracted error from HTML:', errorMessage);
+          } else {
+            errorMessage = `Server error (${response.status}): The server returned an HTML error page. This usually means the endpoint doesn't exist or the server is misconfigured.`;
+          }
+        } else {
+          // Try to parse error as JSON
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+            errorMessage = errorData.message || errorData.error || errorText;
+          } catch {
+            errorMessage = errorText || `HTTP error! status: ${response.status}`;
+          }
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log('✅ Round updated successfully');
+      console.log('📦 Response data:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Update round API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      throw error;
+    }
+  }
+
   // Move Players to Round API
   // POST /api/v1/organizers/tournaments/{tournament_id}/rounds/{round_id}/players
   // Requires Authorization Bearer token in header
@@ -1104,6 +1216,108 @@ class MatchesApiService {
         name: error instanceof Error ? error.name : 'Unknown'
       });
 
+      throw error;
+    }
+  }
+
+  // Cancel/Delete Match API
+  // DELETE /api/v1/organizers/tournaments/{tournament_id}/rounds/{round_id}/matches/{match_id}
+  // Requires Authorization Bearer token in header
+  async cancelMatch(
+    tournamentId: string,
+    roundId: string,
+    matchId: string,
+    deleteMatch: boolean = false
+  ): Promise<any> {
+    try {
+      console.log('❌ Calling cancel match API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      console.log('🎲 Round ID:', roundId);
+      console.log('🎮 Match ID:', matchId);
+      console.log('🗑️ Delete Match:', deleteMatch);
+
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/rounds/${roundId}/matches/${matchId}`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: DELETE');
+      console.log('🔐 Using Authorization Bearer token from authService');
+
+      // Validate URL and IDs
+      if (!tournamentId || !roundId || !matchId) {
+        throw new Error(`Invalid parameters: tournamentId=${tournamentId}, roundId=${roundId}, matchId=${matchId}`);
+      }
+
+      const requestBody = {
+        deleteMatch: deleteMatch
+      };
+
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        console.log('❌ Unauthorized request (401), token expired or invalid');
+        console.log('🔐 Logging out user and redirecting to login page...');
+        authService.logout();
+        window.location.href = '/login';
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+        console.error('❌ Response status:', response.status);
+        console.error('❌ Response headers:', Object.fromEntries(response.headers.entries()));
+        
+        // Check if response is HTML (server error page)
+        const contentType = response.headers.get('content-type') || '';
+        const isHtml = contentType.includes('text/html') || errorText.trim().startsWith('<!DOCTYPE') || errorText.trim().startsWith('<html') || errorText.includes('<title>');
+        
+        let errorMessage: string;
+        
+        if (isHtml) {
+          // Try to extract error message from HTML
+          const match = errorText.match(/<pre[^>]*>([^<]+)<\/pre>/i) || errorText.match(/Cannot (PUT|POST|GET|DELETE)[^\n]*/i);
+          if (match) {
+            errorMessage = match[1] || match[0];
+            console.error('❌ Extracted error from HTML:', errorMessage);
+          } else {
+            errorMessage = `Server error (${response.status}): The server returned an HTML error page. This usually means the endpoint doesn't exist or the server is misconfigured.`;
+          }
+        } else {
+          // Try to parse error as JSON
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+            errorMessage = errorData.message || errorData.error || errorText;
+          } catch {
+            errorMessage = errorText || `HTTP error! status: ${response.status}`;
+          }
+        }
+        
+        throw new Error(errorMessage);
+      }
+
+      const data = await response.json();
+      console.log('✅ Match cancelled successfully');
+      console.log('📦 Response data:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Cancel match API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
       throw error;
     }
   }

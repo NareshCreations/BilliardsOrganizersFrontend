@@ -247,6 +247,7 @@ interface MatchesState {
   selectedRoundId: string | null;
   selectedPlayersForMovement: Player[];
   usedRoundNames: string[]; // Track which round names have been used
+  shuffledRounds: Set<string>; // Track which rounds have been shuffled (hide button after first shuffle)
   showOddNumberAlert: boolean; // Show alert for odd number validation
   oddNumberAlertMessage: string; // Message for odd number alert
   showWinnerSelectionModal: boolean; // Show winner selection modal
@@ -378,6 +379,7 @@ selectedRoundDisplayName: '',
       selectedRoundId: 'dashboard', // Track which round is selected in dropdown (default to dashboard)
       selectedPlayersForMovement: [], // Track players selected for moving to other rounds
       usedRoundNames: [], // Track which round names have been used
+      shuffledRounds: new Set<string>(), // Track which rounds have been shuffled (hide button after first shuffle)
       showOddNumberAlert: false, // Show alert for odd number validation
       oddNumberAlertMessage: '', // Message for odd number alert
       showWinnerSelectionModal: false, // Show winner selection modal
@@ -2675,7 +2677,9 @@ selectedRoundDisplayName: '',
     showGameOrganization: true,
     showTournamentModal: false,
           selectedTournament: null,
-          loading: false
+          loading: false,
+          // Preserve shuffledRounds state when reloading tournament data
+          shuffledRounds: this.state.shuffledRounds || new Set<string>()
         });
 
         console.log('✅ Navigated directly to tournament dashboard (status:', status, ')');
@@ -3431,62 +3435,196 @@ selectedRoundDisplayName: '',
     }
   };
 
-  private cancelMatch = (matchId: string): void => {
-    // Find the match and its players before deleting
-    let cancelledMatch = null;
-    const updatedRounds = this.state.rounds.map(round => ({
-      ...round,
-      matches: round.matches.filter(match => {
-        if (match.id === matchId) {
-          cancelledMatch = match;
-          return false; // Remove this match
-        }
-        return true; // Keep other matches
-      }),
-      // Also remove the players from the round's players array
-      players: round.matches.some(match => match.id === matchId) 
-        ? round.players.filter(player => {
-            const cancelledPlayers = round.matches
-              .filter(match => match.id === matchId)
-              .flatMap(match => [match.player1, match.player2]);
-            return !cancelledPlayers.some(cancelledPlayer => cancelledPlayer.id === player.id);
-          })
-        : round.players
-    }));
-
-    // Move players back to Tournament Dashboard (main area)
-    if (cancelledMatch && this.state.currentGameMatch) {
-      const playersToReturn = [cancelledMatch.player1, cancelledMatch.player2];
+  private cancelMatch = async (matchId: string): Promise<void> => {
+    try {
+      // Find the match and its round to get IDs
+      let cancelledMatch: TournamentMatch | null = null;
+      let foundRound: TournamentRound | null = null;
       
-      // Update allPlayers to set status back to 'available'
-      const updatedAllPlayers = this.state.currentGameMatch.allPlayers.map((player: Player) => {
-        const isReturningPlayer = playersToReturn.some(p => p.id === player.id);
-        if (isReturningPlayer) {
-          return {
-            ...player,
-            status: 'available' as const,
-            selected: false,
-            currentRound: null
-          };
+      for (const round of this.state.rounds) {
+        const match = round.matches.find(m => m.id === matchId);
+        if (match) {
+          cancelledMatch = match;
+          foundRound = round;
+          break;
         }
-        return player;
+      }
+      
+      if (!cancelledMatch || !foundRound) {
+        console.error('❌ Match not found:', matchId);
+        this.showCustomAlert('Error', 'Match not found. Cannot cancel match.');
+        return;
+      }
+      
+      // Get tournament ID
+      const tournamentId = this.state.currentGameMatch?.tournamentId || this.state.selectedTournament?.id?.toString();
+      if (!tournamentId) {
+        console.error('❌ Tournament ID not found');
+        this.showCustomAlert('Error', 'Tournament ID not found. Cannot cancel match.');
+        return;
+      }
+      
+      // Get round API ID
+      const roundApiId = foundRound.apiRoundId || foundRound.id;
+      if (!roundApiId) {
+        console.error('❌ Round API ID not found');
+        this.showCustomAlert('Error', 'Round ID not found. Cannot cancel match.');
+        return;
+      }
+      
+      // Get match API ID - use apiMatchId if available, otherwise try to extract UUID from matchId
+      let matchApiId: string | undefined = cancelledMatch.apiMatchId;
+      
+      // If apiMatchId is not set, try to extract UUID from the local matchId format
+      // Local format might be: "match_UUID_1" or just "match_UUID" or just the UUID
+      if (!matchApiId && matchId) {
+        // Check if matchId is already a UUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidPattern.test(matchId)) {
+          // It's already a UUID, use it
+          matchApiId = matchId;
+        } else {
+          // Try to extract UUID from formats like "match_UUID_1" or "match_UUID" or "match-UUID"
+          const uuidMatch = matchId.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+          if (uuidMatch && uuidMatch[1]) {
+            matchApiId = uuidMatch[1];
+            console.log('🔍 Extracted UUID from matchId:', {
+              original: matchId,
+              extracted: matchApiId
+            });
+          }
+        }
+      }
+      
+      // Validate that matchApiId is a pure UUID (no prefixes or suffixes)
+      if (matchApiId) {
+        const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (!uuidPattern.test(matchApiId)) {
+          console.error('❌ Invalid UUID format detected:', matchApiId);
+          this.showCustomAlert('Error', `Invalid match ID format: ${matchApiId}. Expected a UUID.`);
+          return;
+        }
+      }
+      
+      if (!matchApiId) {
+        console.error('❌ Match API ID not found. Match details:', {
+          matchId,
+          apiMatchId: cancelledMatch.apiMatchId,
+          match: cancelledMatch
+        });
+        this.showCustomAlert('Error', 'Match API ID not found. This match may not have been saved to the server yet. Cannot cancel match.');
+        return;
+      }
+      
+      console.log('🔄 Cancelling match via API...', {
+        tournamentId,
+        roundId: roundApiId,
+        matchId: matchApiId,
+        originalMatchId: matchId,
+        apiMatchIdFromMatch: cancelledMatch.apiMatchId,
+        isValidUUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matchApiId)
       });
+      
+      // Show loading state
+      this.setState({ loading: true });
+      
+      // Call the API to cancel the match
+      const response = await matchesApiService.cancelMatch(
+        tournamentId,
+        roundApiId,
+        matchApiId,
+        true // Set deleteMatch to true to delete the match
+      );
+      
+      if (response.success) {
+        console.log('✅ Match cancelled successfully via API');
+        
+        // Update local state after successful API call
+        const updatedRounds = this.state.rounds.map(round => ({
+          ...round,
+          matches: round.matches.filter(match => {
+            if (match.id === matchId) {
+              return false; // Remove this match
+            }
+            return true; // Keep other matches
+          }),
+          // Also remove the players from the round's players array
+          players: round.matches.some(match => match.id === matchId) 
+            ? round.players.filter(player => {
+                const cancelledPlayers = round.matches
+                  .filter(match => match.id === matchId)
+                  .flatMap(match => [match.player1, match.player2]);
+                return !cancelledPlayers.some(cancelledPlayer => cancelledPlayer.id === player.id);
+              })
+            : round.players
+        }));
 
-      // Update the current game match
-      const updatedCurrentGameMatch = {
-        ...this.state.currentGameMatch,
-        allPlayers: updatedAllPlayers
-      };
+        // Move players back to Tournament Dashboard (main area)
+        if (cancelledMatch && this.state.currentGameMatch) {
+          const playersToReturn = [cancelledMatch.player1, cancelledMatch.player2];
+          
+          // Update allPlayers to set status back to 'available'
+          const updatedAllPlayers = this.state.currentGameMatch.allPlayers.map((player: Player) => {
+            const isReturningPlayer = playersToReturn.some(p => p.id === player.id);
+            if (isReturningPlayer) {
+              return {
+                ...player,
+                status: 'available' as const,
+                selected: false,
+                currentRound: null
+              };
+            }
+            return player;
+          });
 
-      this.setState({ 
-        rounds: updatedRounds,
-        currentGameMatch: updatedCurrentGameMatch
-      });
+          // Update the current game match
+          const updatedCurrentGameMatch = {
+            ...this.state.currentGameMatch,
+            allPlayers: updatedAllPlayers
+          };
 
-      console.log(`Cancelled and deleted match: ${matchId}. Returned players: ${playersToReturn.map(p => p.name).join(', ')} to Tournament Dashboard and removed from round`);
-    } else {
-      this.setState({ rounds: updatedRounds });
-      console.log(`Cancelled and deleted match: ${matchId}`);
+          this.setState({ 
+            rounds: updatedRounds,
+            currentGameMatch: updatedCurrentGameMatch,
+            loading: false
+          });
+
+          console.log(`✅ Cancelled match: ${matchId}. Returned players: ${playersToReturn.map(p => this.getPlayerDisplayName(p)).join(', ')} to Tournament Dashboard and removed from round`);
+          
+          this.showCustomAlert(
+            'Match Cancelled',
+            `Match has been cancelled successfully.\n\nPlayers returned to available pool.`
+          );
+        } else {
+          this.setState({ 
+            rounds: updatedRounds,
+            loading: false
+          });
+          
+          console.log(`✅ Cancelled match: ${matchId}`);
+          
+          this.showCustomAlert(
+            'Match Cancelled',
+            `Match has been cancelled successfully.`
+          );
+        }
+      } else {
+        throw new Error(response.message || 'Failed to cancel match');
+      }
+    } catch (error) {
+      console.error('❌ Error cancelling match:', error);
+      this.setState({ loading: false });
+      
+      if (this.isSessionExpiredError(error)) {
+        console.log('🔐 Session expired, redirecting to login...');
+        return;
+      }
+      
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.showCustomAlert(
+        'Error Cancelling Match',
+        `Failed to cancel match: ${errorMessage}`
+      );
     }
   };
 
@@ -4748,17 +4886,24 @@ selectedRoundDisplayName: '',
     }
   };
 
-  private shuffleRoundPlayers = (roundId: string): void => {
+  private shuffleRoundPlayers = async (roundId: string): Promise<void> => {
+    console.log('🔄🔄🔄 ========== SHUFFLE FUNCTION CALLED ==========');
+    console.log('🔄 shuffleRoundPlayers called with roundId:', roundId);
+    console.log('🔄 Current timestamp:', new Date().toISOString());
+    
     const roundIndex = this.state.rounds.findIndex(r => r.id === roundId);
+    console.log('🔄 Round index found:', roundIndex);
     if (roundIndex === -1) {
-      console.log('Round not found');
+      console.log('❌ Round not found');
       return;
     }
 
     const round = this.state.rounds[roundIndex];
+    console.log('✅ Round found:', round.displayName || round.name);
     
     // Check if round is frozen
     if (round.isFrozen) {
+      console.log('❌ Round is frozen, cannot shuffle');
       this.showCustomAlert(
         'Cannot Shuffle Round',
         `Cannot shuffle "${round.displayName || round.name}".\n\nThis round is frozen and no more changes are allowed.`
@@ -4766,44 +4911,87 @@ selectedRoundDisplayName: '',
       return;
     }
     
-    // Get all players who are already in matches
+    // Get tournament ID
+    const tournamentId = this.state.currentGameMatch?.tournamentId || this.state.selectedTournament?.id?.toString();
+    console.log('🏆 Tournament ID:', tournamentId);
+    if (!tournamentId) {
+      console.error('❌ Tournament ID not found');
+      this.showCustomAlert('Error', 'Tournament ID not found. Cannot shuffle round.');
+      return;
+    }
+
+    // Get round API ID
+    const roundApiId = round.apiRoundId || round.id;
+    console.log('🎯 Round API ID:', roundApiId);
+    if (!roundApiId) {
+      console.error('❌ Round API ID not found');
+      this.showCustomAlert('Error', 'Round ID not found. Cannot shuffle round.');
+      return;
+    }
+    
+    // Check if we should shuffle all players or just unmatched players
+    // If all players are in matches, shuffle ALL players and recreate ALL matches
+    // Otherwise, only shuffle unmatched players and add new matches
+    
     const matchedPlayerIds = new Set();
     round.matches.forEach(match => {
       matchedPlayerIds.add(match.player1.id);
       matchedPlayerIds.add(match.player2.id);
     });
     
-    // Filter out players who are already in matches - only shuffle unmatched players
     const unmatchedPlayers = round.players.filter(player => !matchedPlayerIds.has(player.id));
+    const allPlayersMatched = unmatchedPlayers.length === 0;
     
-    if (unmatchedPlayers.length === 0) {
-      console.log('No unmatched players to shuffle');
+    console.log('👥 Total players in round:', round.players.length);
+    console.log('👥 Players in matches:', matchedPlayerIds.size);
+    console.log('👥 Unmatched players:', unmatchedPlayers.length);
+    console.log('🔄 Shuffle mode:', allPlayersMatched ? 'ALL PLAYERS (recreate all matches)' : 'UNMATCHED PLAYERS (add new matches)');
+    
+    // Determine which players to shuffle
+    let playersToShuffle: Player[];
+    
+    if (allPlayersMatched) {
+      // All players are in matches - shuffle ALL players and recreate ALL matches
+      console.log('✅ All players are matched - will reshuffle ALL players and recreate ALL matches');
+      playersToShuffle = [...round.players];
+    } else {
+      // Some players are unmatched - only shuffle unmatched players
+      console.log('✅ Some players unmatched - will shuffle unmatched players and add new matches');
+      
+      // Check if unmatched players count is odd number
+      if (unmatchedPlayers.length % 2 !== 0) {
+        console.log('❌ Odd number of unmatched players - returning early');
+        this.setState({
+          showOddNumberAlert: true,
+          oddNumberAlertMessage: `Cannot create matches in "${round.displayName || round.name}".\n\nThere are ${unmatchedPlayers.length} unmatched players (odd number).\n\nRounds must have even number of players for proper match pairings.\n\nPlease add or remove 1 player to create matches.`
+        });
+        return;
+      }
+      
+      playersToShuffle = [...unmatchedPlayers];
+    }
+    
+    // Check if we have even number of players to shuffle
+    if (playersToShuffle.length % 2 !== 0) {
+      console.log('❌ Odd number of players to shuffle - returning early');
+      this.showCustomAlert('Error', `Cannot shuffle "${round.displayName || round.name}".\n\nThere are ${playersToShuffle.length} players (odd number).\n\nRounds must have even number of players for proper match pairings.`);
       return;
     }
-
-    // Check if unmatched players count is odd number
-    if (unmatchedPlayers.length % 2 !== 0) {
-      this.setState({
-        showOddNumberAlert: true,
-        oddNumberAlertMessage: `Cannot create matches in "${round.displayName || round.name}".\n\nThere are ${unmatchedPlayers.length} unmatched players (odd number).\n\nRounds must have even number of players for proper match pairings.\n\nPlease add or remove 1 player to create matches.`
-      });
-      return;
-    }
     
-    // Shuffle only the unmatched players
-    const playersToShuffle = [...unmatchedPlayers];
+    console.log('✅ Validation passed, proceeding with shuffle...');
+    
+    // Shuffle the players
     for (let i = playersToShuffle.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [playersToShuffle[i], playersToShuffle[j]] = [playersToShuffle[j], playersToShuffle[i]];
     }
 
-    // Create new matches from unmatched players
+    // Create matches from shuffled players
     const newMatches: TournamentMatch[] = [];
-    const existingMatchCount = round.matches.length;
     for (let i = 0; i < playersToShuffle.length; i += 2) {
       if (i + 1 < playersToShuffle.length) {
         newMatches.push({
-          id: `match_${roundId}_${existingMatchCount + Math.floor(i / 2) + 1}`,
+          id: `match_${roundId}_${Math.floor(i / 2) + 1}`,
           player1: playersToShuffle[i],
           player2: playersToShuffle[i + 1],
           status: 'pending' as const
@@ -4811,22 +4999,206 @@ selectedRoundDisplayName: '',
       }
     }
 
-    // Combine existing matches with new matches
-    const allMatches = [...round.matches, ...newMatches];
+    // Determine final matches list and which matches to delete
+    let allMatches: TournamentMatch[];
+    let matchesToDelete: string[] = [];
+    
+    if (allPlayersMatched) {
+      // Replace all existing matches with new shuffled matches
+      // Collect old match IDs to delete
+      matchesToDelete = round.matches
+        .filter(m => m.apiMatchId)
+        .map(m => m.apiMatchId!);
+      
+      allMatches = newMatches;
+      console.log(`🔄 Replaced all ${round.matches.length} existing matches with ${newMatches.length} new shuffled matches`);
+      console.log(`🗑️ Will delete ${matchesToDelete.length} old match IDs:`, matchesToDelete);
+    } else {
+      // Keep existing matches and add new ones
+      allMatches = [...round.matches, ...newMatches];
+      console.log(`🔄 Added ${newMatches.length} new matches to existing ${round.matches.length} matches`);
+    }
 
-    // Update the round with existing matches + new matches
-    const updatedRounds = this.state.rounds.map((r, index) => {
-      if (index === roundIndex) {
-        return {
-          ...r,
-          matches: allMatches
-        };
+    // Prepare matches data for API - convert to API format
+    const matchesForAPI = allMatches.map((match, index) => {
+      // Get player IDs - use customerProfileId if available, otherwise use id
+      const player1Id = match.player1.customerProfileId || match.player1.id;
+      const player2Id = match.player2.customerProfileId || match.player2.id;
+
+      if (!player1Id || !player2Id) {
+        console.warn('⚠️ Match missing player IDs:', match);
+        console.warn('⚠️ Player1:', match.player1);
+        console.warn('⚠️ Player2:', match.player2);
       }
-      return r;
+
+      // Map match status to API status
+      let apiStatus: 'scheduled' | 'ongoing' | 'completed' | 'cancelled' = 'scheduled';
+      if (match.status === 'completed') {
+        apiStatus = 'completed';
+      } else if ((match as any).status === 'cancelled') {
+        apiStatus = 'cancelled';
+      } else if (match.status === 'active') {
+        apiStatus = 'ongoing';
+      } else {
+        apiStatus = 'scheduled';
+      }
+
+      const matchData: any = {
+        player1Id: player1Id?.toString() || '',
+        player2Id: player2Id?.toString() || '',
+        matchNumber: index + 1,
+        status: apiStatus,
+      };
+
+      // Include match ID if it exists (for updates) - check both apiMatchId and id fields
+      if (match.apiMatchId) {
+        matchData.id = match.apiMatchId;
+      } else if ((match as any).id && (match as any).id.toString().startsWith('match-')) {
+        // Don't include local match IDs, only API match IDs
+      }
+
+      // Add optional fields if they exist
+      if (match.winner?.id) {
+        matchData.winnerId = (match.winner.customerProfileId || match.winner.id).toString();
+      }
+      if ((match as any).scorePlayer1 !== undefined) {
+        matchData.scorePlayer1 = (match as any).scorePlayer1;
+      }
+      if ((match as any).scorePlayer2 !== undefined) {
+        matchData.scorePlayer2 = (match as any).scorePlayer2;
+      }
+      if ((match as any).startTime) {
+        matchData.startTime = (match as any).startTime;
+      }
+      if ((match as any).endTime) {
+        matchData.endTime = (match as any).endTime;
+      }
+      if ((match as any).tableNumber) {
+        matchData.tableNumber = (match as any).tableNumber;
+      }
+
+      return matchData;
     });
 
-    this.setState({ rounds: updatedRounds });
-    console.log(`Shuffled ${playersToShuffle.length} unmatched players and created ${newMatches.length} new matches in ${round.displayName || round.name}. Preserved ${round.matches.length} existing matches.`);
+    // Validate matches before sending
+    const validMatches = matchesForAPI.filter(m => m.player1Id && m.player2Id);
+    if (validMatches.length === 0) {
+      console.error('❌ No valid matches to save (missing player IDs)');
+      this.showCustomAlert('Error', 'Cannot save matches: Missing player IDs. Please ensure all players have valid IDs.');
+      return;
+    }
+
+    if (validMatches.length !== matchesForAPI.length) {
+      console.warn('⚠️ Some matches are missing player IDs:', matchesForAPI.length - validMatches.length);
+    }
+
+    // Show loading state
+    this.setState({ loading: true });
+
+    try {
+      console.log('🔄🔄🔄 CALLING UPDATE ROUND API NOW...');
+      console.log('📋 Tournament ID:', tournamentId);
+      console.log('📋 Round API ID:', roundApiId);
+      console.log('📋 Matches to save:', validMatches);
+      console.log('📋 Total matches:', validMatches.length);
+      console.log('📋 All players matched?', allPlayersMatched);
+      console.log('📋 Matches to delete:', matchesToDelete);
+
+      // Prepare update payload
+      const updatePayload: any = {
+        matches: validMatches
+      };
+      
+      // If we're replacing all matches, include deleteMatchIds
+      if (allPlayersMatched && matchesToDelete.length > 0) {
+        updatePayload.deleteMatchIds = matchesToDelete;
+        console.log('🗑️ Including deleteMatchIds in API request:', matchesToDelete);
+      }
+      
+      console.log('📤 Final payload being sent:', JSON.stringify(updatePayload, null, 2));
+      
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('API call timeout after 30 seconds')), 30000);
+      });
+      
+      // Call update round API with timeout
+      console.log('⏱️ Starting API call with 30s timeout...');
+      const apiCallPromise = matchesApiService.updateRound(tournamentId, roundApiId, updatePayload);
+      const response = await Promise.race([apiCallPromise, timeoutPromise]) as any;
+      
+      console.log('📥 API Response received:', response);
+
+      if (response.success) {
+        console.log('✅ Round updated successfully with shuffled matches');
+        
+        // Mark this round as shuffled (hide button after first shuffle)
+        // Use both round.id and roundId to ensure we catch it regardless of which ID is used
+        const updatedShuffledRounds = new Set(this.state.shuffledRounds);
+        updatedShuffledRounds.add(roundId);
+        updatedShuffledRounds.add(round.id); // Also add the round's id property
+        console.log('🔒 Marking round as shuffled. Round IDs:', { roundId, roundIdFromRound: round.id });
+        console.log('🔒 Updated shuffledRounds Set:', Array.from(updatedShuffledRounds));
+        
+        // Update the round with existing matches + new matches
+        const updatedRounds = this.state.rounds.map((r, index) => {
+          if (index === roundIndex) {
+            return {
+              ...r,
+              matches: allMatches
+            };
+          }
+          return r;
+        });
+
+        this.setState({ 
+          rounds: updatedRounds,
+          shuffledRounds: updatedShuffledRounds,
+          loading: false
+        });
+        
+        console.log('🔒 State updated. shuffledRounds after setState:', Array.from(updatedShuffledRounds));
+        
+        this.showCustomAlert(
+          'Success',
+          `Successfully shuffled ${playersToShuffle.length} unmatched players and created ${newMatches.length} new matches in "${round.displayName || round.name}".`
+        );
+        
+        console.log(`Shuffled ${playersToShuffle.length} unmatched players and created ${newMatches.length} new matches in ${round.displayName || round.name}. Preserved ${round.matches.length} existing matches.`);
+      } else {
+        throw new Error(response.message || 'Failed to update round');
+      }
+    } catch (error) {
+      console.error('❌❌❌ ERROR updating round:', error);
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('❌ Error name:', error instanceof Error ? error.name : 'Unknown');
+      console.error('❌ Error message:', error instanceof Error ? error.message : String(error));
+      
+      this.setState({ loading: false });
+      
+      // Check if session expired - redirect to login instead of showing error
+      if (this.isSessionExpiredError(error)) {
+        console.log('🔐 Session expired, redirecting to login...');
+        authService.logout();
+        window.location.href = '/login';
+        return;
+      }
+      
+      const errorMessage = error instanceof Error ? error.message : 'Failed to shuffle round';
+      
+      // Show detailed error to user
+      let userMessage = `Failed to shuffle round: ${errorMessage}`;
+      if (errorMessage.includes('timeout')) {
+        userMessage += '\n\nThe request took too long. Please check your network connection and try again.';
+      } else if (errorMessage.includes('Failed to fetch') || errorMessage.includes('NetworkError')) {
+        userMessage += '\n\nNetwork error. Please check if the backend server is running.';
+      }
+      
+      this.showCustomAlert(
+        'Error',
+        `${userMessage}\n\nPlease try again.`
+      );
+    }
   };
 
   private freezeRound = (roundId: string): void => {
@@ -6099,6 +6471,15 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                 </div>
               </div>
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => window.location.href = '/dashboard'}
+                  className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:from-blue-700 hover:to-purple-700 transition-all flex items-center gap-2 text-sm font-medium shadow-lg"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                  </svg>
+                  Dashboard
+                </button>
                 <div className="text-right">
                   <div className="text-sm font-medium text-white">John Organizer</div>
                   <div className="text-xs text-white/70">Tournament Director</div>
@@ -10836,11 +11217,35 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
   const isStartMatch = unmatchedCount === 2;
   const buttonLabel = isStartMatch ? 'Setup Match' : 'Shuffle';
   
-  // Only show button if there are at least 2 players and round is not frozen
-  if (activeRound.players.length >= 2 && !activeRound.isFrozen) {
+  console.log('🔍 Shuffle button visibility check:', {
+    roundId: activeRound.id,
+    unmatchedCount,
+    playersCount: activeRound.players.length,
+    matchesCount: activeRound.matches?.length || 0,
+    isFrozen: activeRound.isFrozen,
+    willShow: unmatchedCount >= 2 && !activeRound.isFrozen
+  });
+  
+  // Show button if there are at least 2 unmatched players and round is not frozen
+  // This allows shuffling whenever players are added to the unmatched section
+  if (unmatchedCount >= 2 && !activeRound.isFrozen) {
     return (
       <button
-        onClick={() => this.shuffleRoundPlayers(activeRound.id)}
+        onClick={async (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          console.log('🖱️🖱️🖱️ SHUFFLE BUTTON CLICKED!', {
+            roundId: activeRound.id,
+            roundName: activeRound.displayName || activeRound.name,
+            playersCount: activeRound.players.length,
+            matchesCount: activeRound.matches.length
+          });
+          try {
+            await this.shuffleRoundPlayers(activeRound.id);
+          } catch (error) {
+            console.error('❌ Error in shuffle button handler:', error);
+          }
+        }}
         className={`px-3 py-1 text-white text-sm rounded flex items-center gap-1 transition-colors ${
           isStartMatch ? 'bg-green-600 hover:bg-green-700' : 'bg-purple-600 hover:bg-purple-700'
         }`}

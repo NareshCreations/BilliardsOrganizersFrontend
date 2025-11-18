@@ -103,6 +103,12 @@ const OrganizerDashboard: React.FC<DashboardProps> = (props) => {
    * Handle section navigation
    */
   const handleSectionChange = (section: 'dashboard' | 'tournaments' | 'players' | 'live-games') => {
+    // If tournaments is clicked, navigate to /tournaments route instead of changing section
+    if (section === 'tournaments') {
+      console.log('Navigating to /tournaments route');
+      navigate('/tournaments');
+      return;
+    }
     setActiveSection(section);
     console.log('Section changed', { section });
   };
