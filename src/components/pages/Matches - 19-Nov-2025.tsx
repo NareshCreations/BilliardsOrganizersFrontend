@@ -3,7 +3,6 @@ import { BaseComponentComplete } from '../base/BaseComponent';
 import { Calendar, Clock, Users, Settings, Trophy, Plus, Save, X, Check, AlertCircle, MapPin, User, Target, ChevronRight, Bell, Trash2 } from 'lucide-react';
 import { matchesApiService, Match as ApiMatch } from '../../services/matchesApi';
 import authService from '../../services/authService';
-import socketService from '../../services/socketService';
 
 // Global fallback avatar for empty/missing profile pictures (gravatar default)
 const DEFAULT_AVATAR = 'https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y&s=400';
@@ -405,280 +404,7 @@ selectedRoundDisplayName: '',
 
   componentDidMount() {
     this.loadData();
-    this.initializeWebSocket();
   }
-
-  componentDidUpdate(prevProps: MatchesProps, prevState: MatchesState) {
-    // Handle tournament changes - join/leave rooms as needed
-    const prevTournamentId = prevState.currentGameMatch?.tournamentId;
-    const currentTournamentId = this.state.currentGameMatch?.tournamentId;
-
-    if (prevTournamentId !== currentTournamentId) {
-      // Leave previous tournament room if it existed
-      if (prevTournamentId) {
-        socketService.leaveTournament(prevTournamentId);
-      }
-
-      // Join new tournament room if it exists
-      if (currentTournamentId) {
-        socketService.joinTournament(currentTournamentId);
-      }
-    }
-  }
-
-  componentWillUnmount() {
-    // Cleanup WebSocket connections
-    this.cleanupWebSocket();
-  }
-
-  /**
-   * Initialize WebSocket connection and event listeners
-   */
-  private initializeWebSocket = (): void => {
-    // Connect socket service
-    socketService.connect();
-
-    // Set up event listeners
-    socketService.on('player:registered', this.handlePlayerRegistered);
-    socketService.on('match:update', this.handleMatchUpdate);
-    socketService.on('round:update', this.handleRoundUpdate);
-    socketService.on('tournament:status', this.handleTournamentStatus);
-
-    // Join tournament room if we have an active tournament
-    if (this.state.currentGameMatch?.tournamentId) {
-      socketService.joinTournament(this.state.currentGameMatch.tournamentId);
-    }
-  };
-
-  /**
-   * Cleanup WebSocket connections and listeners
-   */
-  private cleanupWebSocket = (): void => {
-    // Remove event listeners
-    socketService.off('player:registered', this.handlePlayerRegistered);
-    socketService.off('match:update', this.handleMatchUpdate);
-    socketService.off('round:update', this.handleRoundUpdate);
-    socketService.off('tournament:status', this.handleTournamentStatus);
-
-    // Leave tournament room if joined
-    if (this.state.currentGameMatch?.tournamentId) {
-      socketService.leaveTournament(this.state.currentGameMatch.tournamentId);
-    }
-  };
-
-  /**
-   * Handle player registered event from WebSocket
-   */
-  private handlePlayerRegistered = (data: {
-    tournamentId: string;
-    playerId: string;
-    playerName: string;
-    registeredCount: number;
-    registrationId: string;
-    timestamp: string;
-  }): void => {
-    console.log('📢 WebSocket: Player registered:', data);
-
-    // Only update if this is for the current tournament
-    if (this.state.currentGameMatch?.tournamentId === data.tournamentId) {
-      // Update registered count
-      this.setState(prevState => {
-        if (prevState.currentGameMatch) {
-          return {
-            currentGameMatch: {
-              ...prevState.currentGameMatch,
-              players: data.registeredCount,
-              currentParticipants: data.registeredCount
-            }
-          };
-        }
-        return null;
-      });
-
-      // Show notification
-      this.showCustomAlert(
-        'New Registration',
-        `${data.playerName} has registered for the tournament!\n\nTotal registered: ${data.registeredCount}`
-      );
-
-      // Optionally refresh player list
-      // You can add logic here to refresh the player list if needed
-    }
-  };
-
-  /**
-   * Handle match update event from WebSocket
-   */
-  private handleMatchUpdate = (data: {
-    tournamentId: string;
-    matchId: string;
-    roundId: string;
-    status: 'scheduled' | 'ongoing' | 'completed' | 'cancelled' | 'deleted';
-    player1Id?: string;
-    player2Id?: string;
-    winnerId?: string | null;
-    scorePlayer1?: number | null;
-    scorePlayer2?: number | null;
-    startTime?: Date | null;
-    endTime?: Date | null;
-    matchNumber?: number;
-    tableNumber?: number | null;
-    deleted?: boolean;
-    timestamp: string;
-  }): void => {
-    console.log('📢 WebSocket: Match update:', data);
-
-    // Only update if this is for the current tournament
-    if (this.state.currentGameMatch?.tournamentId === data.tournamentId) {
-      if (data.deleted) {
-        // Remove match from UI
-        this.setState(prevState => ({
-          rounds: prevState.rounds.map(round => ({
-            ...round,
-            matches: round.matches.filter(m => m.apiMatchId !== data.matchId)
-          }))
-        }));
-
-        this.showCustomAlert(
-          'Match Deleted',
-          `Match ${data.matchNumber || data.matchId} has been deleted.`
-        );
-      } else {
-        // Update match in UI
-        this.setState(prevState => ({
-          rounds: prevState.rounds.map(round => {
-            if (round.apiRoundId === data.roundId) {
-              return {
-                ...round,
-                matches: round.matches.map(match => {
-                  if (match.apiMatchId === data.matchId) {
-                    return {
-                      ...match,
-                      status: data.status === 'ongoing' ? 'active' as const : 
-                              data.status === 'completed' ? 'completed' as const :
-                              data.status === 'cancelled' ? 'cancelled' as const : 'pending' as const,
-                      startTime: data.startTime ? new Date(data.startTime).toISOString() : match.startTime,
-                      endTime: data.endTime ? new Date(data.endTime).toISOString() : match.endTime,
-                      winner: data.winnerId ? {
-                        id: data.winnerId,
-                        name: '',
-                        email: '',
-                        skill: '',
-                        profilePic: ''
-                      } : match.winner
-                    };
-                  }
-                  return match;
-                })
-              };
-            }
-            return round;
-          })
-        }));
-
-        // Show notification for completed matches
-        if (data.status === 'completed') {
-          this.showCustomAlert(
-            'Match Completed',
-            `Match ${data.matchNumber || data.matchId} has been completed!`
-          );
-        } else if (data.status === 'ongoing') {
-          this.showCustomAlert(
-            'Match Started',
-            `Match ${data.matchNumber || data.matchId} has started!`
-          );
-        }
-      }
-    }
-  };
-
-  /**
-   * Handle round update event from WebSocket
-   */
-  private handleRoundUpdate = (data: {
-    tournamentId: string;
-    roundId: string;
-    roundNumber: number;
-    roundName?: string | null;
-    roundDisplayName?: string | null;
-    status: 'pending' | 'active' | 'completed';
-    isFreezed: boolean;
-    timestamp: string;
-  }): void => {
-    console.log('📢 WebSocket: Round update:', data);
-
-    // Only update if this is for the current tournament
-    if (this.state.currentGameMatch?.tournamentId === data.tournamentId) {
-      this.setState(prevState => ({
-        rounds: prevState.rounds.map(round => {
-          if (round.apiRoundId === data.roundId) {
-            return {
-              ...round,
-              name: data.roundName || round.name,
-              displayName: data.roundDisplayName || round.displayName,
-              status: data.status,
-              isFrozen: data.isFreezed
-            };
-          }
-          return round;
-        })
-      }));
-
-      // Show notification for status changes
-      if (data.status === 'completed') {
-        this.showCustomAlert(
-          'Round Completed',
-          `Round ${data.roundNumber} (${data.roundDisplayName || data.roundName || 'Round'}) has been completed!`
-        );
-      } else if (data.status === 'active') {
-        this.showCustomAlert(
-          'Round Started',
-          `Round ${data.roundNumber} (${data.roundDisplayName || data.roundName || 'Round'}) has started!`
-        );
-      }
-    }
-  };
-
-  /**
-   * Handle tournament status event from WebSocket
-   */
-  private handleTournamentStatus = (data: {
-    tournamentId: string;
-    status: 'started' | 'completed';
-    startedAt?: Date;
-    endedAt?: Date;
-    timestamp: string;
-  }): void => {
-    console.log('📢 WebSocket: Tournament status:', data);
-
-    // Only update if this is for the current tournament
-    if (this.state.currentGameMatch?.tournamentId === data.tournamentId) {
-      this.setState(prevState => {
-        if (prevState.currentGameMatch) {
-          return {
-            currentGameMatch: {
-              ...prevState.currentGameMatch,
-              status: data.status === 'started' ? 'ongoing' : data.status === 'completed' ? 'completed' : prevState.currentGameMatch.status
-            }
-          };
-        }
-        return null;
-      });
-
-      // Show notification
-      if (data.status === 'started') {
-        this.showCustomAlert(
-          'Tournament Started',
-          'The tournament has started! Registration is now closed.'
-        );
-      } else if (data.status === 'completed') {
-        this.showCustomAlert(
-          'Tournament Completed',
-          'The tournament has ended!'
-        );
-      }
-    }
-  };
 
   /**
    * Helper method to check if an error indicates session expiration
@@ -700,13 +426,7 @@ selectedRoundDisplayName: '',
   private handleError(error: any, defaultMessage: string, alertTitle: string = 'Error'): void {
     if (this.isSessionExpiredError(error)) {
       console.log('🔐 Session expired, redirecting to login...');
-      authService.logout();
-      // Use replace instead of href to prevent back button navigation
-      setTimeout(() => {
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-          window.location.replace('/login');
-        }
-      }, 0);
+      // Don't show alert, redirect is already handled by API or will be handled by authService
       return;
     }
     
@@ -1097,13 +817,6 @@ selectedRoundDisplayName: '',
       this.setState({ loading: false });
       if (this.isSessionExpiredError(error)) {
         console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
         return;
       }
       const errorMessage = error instanceof Error ? error.message : 'Failed to create tournament';
@@ -1565,20 +1278,6 @@ selectedRoundDisplayName: '',
       }
     } catch (error) {
       console.error('❌ Error moving players to round:', error);
-      
-      // Check if session expired - redirect to login instead of showing error
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
-        return;
-      }
-      
       const errorMessage = error instanceof Error ? error.message : 'Failed to move players to round';
       this.setState({ loading: false });
       this.showCustomAlert(
@@ -3100,13 +2799,6 @@ selectedRoundDisplayName: '',
       this.setState({ loading: false });
       if (this.isSessionExpiredError(error)) {
         console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
         return;
       }
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete tournament';
@@ -3546,11 +3238,6 @@ selectedRoundDisplayName: '',
           showTournamentModal: false,
           selectedTournament: null
         });
-
-        // Join tournament room for WebSocket updates
-        if (tournamentData.tournamentId) {
-          socketService.joinTournament(tournamentData.tournamentId);
-        }
       }
     }
   };
@@ -3738,13 +3425,6 @@ selectedRoundDisplayName: '',
       this.setState({ loading: false });
       if (this.isSessionExpiredError(error)) {
         console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
         return;
       }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -3932,13 +3612,6 @@ selectedRoundDisplayName: '',
       
       if (this.isSessionExpiredError(error)) {
         console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
         return;
       }
       
@@ -4322,13 +3995,6 @@ selectedRoundDisplayName: '',
       this.setState({ loading: false });
       if (this.isSessionExpiredError(error)) {
         console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
         return;
       }
       const errorMessage = error instanceof Error ? error.message : 'Failed to complete match';
@@ -4807,13 +4473,6 @@ selectedRoundDisplayName: '',
           this.setState({ loading: false });
           if (this.isSessionExpiredError(error)) {
             console.log('🔐 Session expired, redirecting to login...');
-            authService.logout();
-            // Use replace instead of href to prevent back button navigation
-            setTimeout(() => {
-              if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-                window.location.replace('/login');
-              }
-            }, 0);
             return;
           }
           const errorMessage = error instanceof Error ? error.message : 'Failed to delete round';
@@ -5355,28 +5014,6 @@ selectedRoundDisplayName: '',
       console.log(`🔄 Added ${newMatches.length} new matches to existing ${round.matches.length} matches`);
     }
 
-    // Calculate the highest existing match number to avoid conflicts
-    // First, try to get match numbers from existing matches
-    let highestMatchNumber = 0;
-    round.matches.forEach(match => {
-      const existingMatchNumber = (match as any).matchNumber;
-      if (existingMatchNumber && typeof existingMatchNumber === 'number') {
-        highestMatchNumber = Math.max(highestMatchNumber, existingMatchNumber);
-      }
-    });
-    
-    // If no match numbers found in local data, use the count of existing matches as fallback
-    // This assumes matches are numbered sequentially starting from 1
-    if (highestMatchNumber === 0 && round.matches.length > 0) {
-      highestMatchNumber = round.matches.length;
-      console.log('⚠️ No match numbers found in local data, using match count as fallback:', highestMatchNumber);
-    }
-    
-    console.log('🔢 Highest existing match number:', highestMatchNumber);
-    
-    // Track match numbers for new matches
-    let nextMatchNumber = highestMatchNumber + 1;
-
     // Prepare matches data for API - convert to API format
     const matchesForAPI = allMatches.map((match, index) => {
       // Get player IDs - use customerProfileId if available, otherwise use id
@@ -5401,33 +5038,10 @@ selectedRoundDisplayName: '',
         apiStatus = 'scheduled';
       }
 
-      // Determine match number: use existing match number if available, otherwise assign next available number
-      let matchNumber: number;
-      
-      // If we're replacing all matches, start from 1
-      if (allPlayersMatched) {
-        matchNumber = index + 1;
-        console.log(`🔢 Replacing all matches - assigning match number ${matchNumber} (index ${index})`);
-      } else {
-        // When adding new matches, preserve existing match numbers and assign new ones
-        const existingMatchNumber = (match as any).matchNumber;
-        const isExistingMatch = round.matches.some(m => m.id === match.id || m.apiMatchId === match.apiMatchId);
-        
-        if (isExistingMatch && existingMatchNumber && typeof existingMatchNumber === 'number' && match.apiMatchId) {
-          // Existing match - preserve its match number
-          matchNumber = existingMatchNumber;
-          console.log(`🔢 Preserving existing match number ${matchNumber} for match ${match.apiMatchId}`);
-        } else {
-          // New match - assign next available match number
-          matchNumber = nextMatchNumber++;
-          console.log(`🔢 Assigning new match number ${matchNumber} for new match`);
-        }
-      }
-
       const matchData: any = {
         player1Id: player1Id?.toString() || '',
         player2Id: player2Id?.toString() || '',
-        matchNumber: matchNumber,
+        matchNumber: index + 1,
         status: apiStatus,
       };
 
@@ -5596,12 +5210,7 @@ selectedRoundDisplayName: '',
       if (this.isSessionExpiredError(error)) {
         console.log('🔐 Session expired, redirecting to login...');
         authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
+        window.location.href = '/login';
         return;
       }
       
@@ -6628,20 +6237,6 @@ selectedRoundDisplayName: '',
       
     } catch (error) {
       console.error('❌ Error creating round:', error);
-      
-      // Check if session expired - redirect to login instead of showing error
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
-        return;
-      }
-      
       const errorMessage = error instanceof Error ? error.message : 'Failed to create round';
       alert(`Error creating round: ${errorMessage}`);
     }
@@ -6860,12 +6455,8 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
         console.log('🔐 Token expiration detected in error state, redirecting to login...');
         // Clear auth state
         authService.logout();
-        // Redirect to login using replace to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
+        // Redirect to login
+        window.location.href = '/login';
         // Return loading state while redirecting
         return (
           <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 w-full flex items-center justify-center">
@@ -7711,8 +7302,8 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     </>
                   )}
 
-                  {/* Existing Scheduled Matches - HIDDEN FOR NOW (hardcoded data) */}
-                  {false && this.state.scheduledMatches.map((match) => (
+                  {/* Existing Scheduled Matches */}
+                  {this.state.scheduledMatches.map((match) => (
                     <div key={match.id} className="border border-gray-200 rounded-lg p-6 hover:bg-gray-50 transition-colors">
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1 cursor-pointer" onClick={() => this.handleMatchClick(match)}>

@@ -50,20 +50,35 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             if (!refreshed) {
               console.log('❌ Token refresh failed, logging out and redirecting to login');
               handleLogout();
-              // Note: Redirect will be handled by ProtectedRoute when auth state changes
+              // Force redirect to login immediately
+              if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+                setTimeout(() => {
+                  window.location.replace('/login');
+                }, 0);
+              }
             } else {
               console.log('✅ Token refreshed successfully');
             }
           } catch (error) {
             console.log('❌ Token refresh error, logging out and redirecting to login:', error);
             handleLogout();
-            // Note: Redirect will be handled by ProtectedRoute when auth state changes
+            // Force redirect to login immediately
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+              setTimeout(() => {
+                window.location.replace('/login');
+              }, 0);
+            }
           }
         }
         if (!authService.isAuthenticated()) {
           console.log('❌ User not authenticated, logging out and redirecting to login');
           handleLogout();
-          // Note: Redirect will be handled by ProtectedRoute when auth state changes
+          // Force redirect to login immediately
+          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+            setTimeout(() => {
+              window.location.replace('/login');
+            }, 0);
+          }
         }
       }, 60000); // Check every minute
 
@@ -190,7 +205,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // If it's a token expiration error, redirect to login
       const errorMessage = error instanceof Error ? error.message : '';
       if (errorMessage.includes('Session expired') || errorMessage.includes('expired') || errorMessage.includes('401')) {
-        window.location.href = '/login';
+        // Use replace instead of href to prevent back button navigation
+        setTimeout(() => {
+          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+            window.location.replace('/login');
+          }
+        }, 0);
       }
     }
   };

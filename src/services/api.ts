@@ -1,6 +1,18 @@
 // API Configuration
 import authService from './authService';
 
+// Helper function to force redirect to login
+const forceRedirectToLogin = (): void => {
+  console.log('🔐 Force redirecting to login page...');
+  authService.logout();
+  // Use setTimeout to ensure redirect happens even if called from error handler
+  setTimeout(() => {
+    if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+      window.location.replace('/login');
+    }
+  }, 0);
+};
+
 // Determine API base URL
 // Use relative path to leverage proxy (Vite in dev, server.js in production)
 // Only use full URL if explicitly set via environment variable
@@ -20,6 +32,26 @@ export const makeAuthenticatedRequest = async (
   url: string, 
   options: RequestInit = {}
 ): Promise<Response> => {
+  // Check token expiration before making request
+  const token = authService.getAccessToken();
+  const expiry = localStorage.getItem('billiards_token_expiry');
+  
+  if (!token || !expiry) {
+    console.log('❌ No token or expiry found before API request');
+    forceRedirectToLogin();
+    throw new Error('Session expired. Please login again.');
+  }
+  
+  // Check if token is expired
+  const expiryDate = new Date(expiry);
+  const now = new Date();
+  
+  if (now >= expiryDate) {
+    console.log('❌ Token expired before API request');
+    forceRedirectToLogin();
+    throw new Error('Session expired. Please login again.');
+  }
+  
   const authHeaders = authService.getAuthHeader();
   
   console.log('🔐 Making authenticated request to:', url);
@@ -39,11 +71,43 @@ export const makeAuthenticatedRequest = async (
   // Handle 401 Unauthorized - redirect to login
   if (response.status === 401) {
     console.log('❌ Unauthorized request (401), token expired or invalid');
-    console.log('🔐 Logging out user and redirecting to login page...');
-    authService.logout();
-    // Redirect to login page
-    window.location.href = '/login';
+    forceRedirectToLogin();
     throw new Error('Session expired. Please login again.');
+  }
+  
+  // Also check response body for token expiration errors (some APIs return 200 with error message)
+  if (response.ok) {
+    try {
+      // Clone response to read body without consuming it
+      const clonedResponse = response.clone();
+      const contentType = clonedResponse.headers.get('content-type') || '';
+      
+      // Only check JSON responses
+      if (contentType.includes('application/json')) {
+        const data = await clonedResponse.json();
+        const errorMessage = data.message || data.error || '';
+        const lowerMessage = errorMessage.toLowerCase();
+        
+        // Check if response indicates token expiration
+        if (
+          lowerMessage.includes('expired') ||
+          lowerMessage.includes('invalid token') ||
+          lowerMessage.includes('unauthorized') ||
+          lowerMessage.includes('session expired') ||
+          lowerMessage.includes('token expired')
+        ) {
+          console.log('❌ Token expiration detected in API response:', errorMessage);
+          forceRedirectToLogin();
+          throw new Error('Session expired. Please login again.');
+        }
+      }
+    } catch (error) {
+      // If error is already a session expired error, re-throw it
+      if (error instanceof Error && error.message.includes('Session expired')) {
+        throw error;
+      }
+      // Otherwise, ignore parsing errors and continue with original response
+    }
   }
   
   return response;
