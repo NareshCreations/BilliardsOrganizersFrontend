@@ -126,7 +126,12 @@ class OrganizerProfileApiService {
       if (response.status === 401) {
         console.log('❌ Unauthorized request (401), token expired or invalid');
         authService.logout();
-        window.location.href = '/login';
+        // Redirect to login page using replace to prevent back button navigation
+        setTimeout(() => {
+          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+            window.location.replace('/login');
+          }
+        }, 0);
         throw new Error('Session expired. Please login again.');
       }
 

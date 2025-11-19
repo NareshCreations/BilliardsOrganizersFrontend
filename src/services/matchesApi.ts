@@ -1,6 +1,19 @@
 // API service for matches data
 import { makeAuthenticatedRequest } from './api';
 import authService from './authService';
+
+// Helper function to force redirect to login when token expires
+const forceRedirectToLogin = (): void => {
+  console.log('🔐 Force redirecting to login page...');
+  authService.logout();
+  // Use setTimeout to ensure redirect happens even if called from error handler
+  // Use replace instead of href to prevent back button navigation
+  setTimeout(() => {
+    if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+      window.location.replace('/login');
+    }
+  }, 0);
+};
 export interface Match {
   id: number;
   name: string;
@@ -508,9 +521,7 @@ class MatchesApiService {
       if (response.status === 401) {
         console.log('❌ Unauthorized request (401), token expired or invalid');
         console.log('🔐 Logging out user and redirecting to login page...');
-        authService.logout();
-        // Redirect to login page
-        window.location.href = '/login';
+        forceRedirectToLogin();
         throw new Error('Session expired. Please login again.');
       }
 
@@ -629,8 +640,7 @@ class MatchesApiService {
       if (response.status === 401) {
         console.log('❌ Unauthorized request (401), token expired or invalid');
         console.log('🔐 Logging out user and redirecting to login page...');
-        authService.logout();
-        window.location.href = '/login';
+        forceRedirectToLogin();
         throw new Error('Session expired. Please login again.');
       }
 
@@ -721,8 +731,7 @@ class MatchesApiService {
       if (response.status === 401) {
         console.log('❌ Unauthorized request (401), token expired or invalid');
         console.log('🔐 Logging out user and redirecting to login page...');
-        authService.logout();
-        window.location.href = '/login';
+        forceRedirectToLogin();
         throw new Error('Session expired. Please login again.');
       }
 
@@ -810,8 +819,7 @@ class MatchesApiService {
       if (response.status === 401) {
         console.log('❌ Unauthorized request (401), token expired or invalid');
         console.log('🔐 Logging out user and redirecting to login page...');
-        authService.logout();
-        window.location.href = '/login';
+        forceRedirectToLogin();
         throw new Error('Session expired. Please login again.');
       }
 
@@ -879,8 +887,7 @@ class MatchesApiService {
       if (response.status === 401) {
         console.log('❌ Unauthorized request (401), token expired or invalid');
         console.log('🔐 Logging out user and redirecting to login page...');
-        authService.logout();
-        window.location.href = '/login';
+        forceRedirectToLogin();
         throw new Error('Session expired. Please login again.');
       }
 
@@ -943,8 +950,7 @@ class MatchesApiService {
       if (response.status === 401) {
         console.log('❌ Unauthorized request (401), token expired or invalid');
         console.log('🔐 Logging out user and redirecting to login page...');
-        authService.logout();
-        window.location.href = '/login';
+        forceRedirectToLogin();
         throw new Error('Session expired. Please login again.');
       }
 
@@ -1022,8 +1028,7 @@ class MatchesApiService {
       if (response.status === 401) {
         console.log('❌ Unauthorized request (401), token expired or invalid');
         console.log('🔐 Logging out user and redirecting to login page...');
-        authService.logout();
-        window.location.href = '/login';
+        forceRedirectToLogin();
         throw new Error('Session expired. Please login again.');
       }
 
@@ -1137,8 +1142,7 @@ class MatchesApiService {
       if (response.status === 401) {
         console.log('❌ Unauthorized request (401), token expired or invalid');
         console.log('🔐 Logging out user and redirecting to login page...');
-        authService.logout();
-        window.location.href = '/login';
+        forceRedirectToLogin();
         throw new Error('Session expired. Please login again.');
       }
 
@@ -1266,8 +1270,7 @@ class MatchesApiService {
       if (response.status === 401) {
         console.log('❌ Unauthorized request (401), token expired or invalid');
         console.log('🔐 Logging out user and redirecting to login page...');
-        authService.logout();
-        window.location.href = '/login';
+        forceRedirectToLogin();
         throw new Error('Session expired. Please login again.');
       }
 
@@ -1351,9 +1354,7 @@ class MatchesApiService {
         console.log('❌ Unauthorized request (401), token expired or invalid');
         console.log('🔐 Logging out user and redirecting to login page...');
         //const authService = (await import('./authService')).default;
-        authService.logout();
-        // Redirect to login page
-        window.location.href = '/login';
+        forceRedirectToLogin();
         throw new Error('Session expired. Please login again.');
       }
 

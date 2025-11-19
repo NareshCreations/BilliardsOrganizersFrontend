@@ -37,8 +37,10 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallback }) =
       localStorage.setItem('redirectAfterLogin', currentPath);
       console.log('🛡️ ProtectedRoute: Stored redirect URL:', currentPath);
     }
-    // Force full page reload to clear all state and redirect to login
-    window.location.href = '/login';
+    // Force immediate redirect to login using replace (prevents back button navigation)
+    setTimeout(() => {
+      window.location.replace('/login');
+    }, 0);
     return null;
   }
 

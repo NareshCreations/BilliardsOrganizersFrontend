@@ -256,8 +256,12 @@ Default expected URL: http://localhost:3002/api/v1`;
           console.log('❌ Profile fetch failed with 401 - token expired');
           console.log('🔐 Logging out user and redirecting to login page...');
           this.logout();
-          // Redirect to login page
-          window.location.href = '/login';
+          // Redirect to login page using replace to prevent back button navigation
+          setTimeout(() => {
+            if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+              window.location.replace('/login');
+            }
+          }, 0);
           throw new Error('Session expired. Please login again.');
         }
         throw new Error(`Profile fetch failed with status ${response.status}`);
@@ -362,9 +366,11 @@ Default expected URL: http://localhost:3002/api/v1`;
     if (now >= expiryDate) {
       console.log('⚠️ Token expired, clearing auth data and redirecting to login');
       this.logout();
-      // Redirect to login page
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+      // Force immediate redirect to login page
+      if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
+        console.log('🔐 Forcing redirect to login page...');
+        // Use replace to prevent back button navigation
+        window.location.replace('/login');
       }
       return false;
     }
