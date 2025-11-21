@@ -323,6 +323,33 @@ export class TournamentBracket extends BaseComponentComplete<TournamentBracketPr
   }
 
   private bracketRefreshTimeout: number | null = null;
+  private lastCapturedScrollY: number | null = null;
+
+  private captureScrollPosition = (): void => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (this.lastCapturedScrollY === null) {
+      this.lastCapturedScrollY = window.scrollY ?? window.pageYOffset ?? 0;
+    }
+  };
+
+  private restoreScrollPosition = (): void => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    if (this.lastCapturedScrollY === null) {
+      return;
+    }
+    const targetY = this.lastCapturedScrollY;
+    this.lastCapturedScrollY = null;
+    window.requestAnimationFrame(() => {
+      window.scrollTo({
+        top: targetY,
+        behavior: 'auto'
+      });
+    });
+  };
 
   private queueBracketRefresh = (reason: string = 'socket-update'): void => {
     if (this.bracketRefreshTimeout) {
@@ -340,7 +367,12 @@ export class TournamentBracket extends BaseComponentComplete<TournamentBracketPr
       return;
     }
     console.log('🔄 Refreshing bracket data due to:', reason);
-    await this.loadBracket(tournamentId);
+    this.captureScrollPosition();
+    try {
+      await this.loadBracket(tournamentId);
+    } finally {
+      this.restoreScrollPosition();
+    }
   };
 
   private getRealPlayerCount = (round: TournamentRound | null | undefined): number => {
@@ -1625,7 +1657,8 @@ selectedRoundDisplayName: '',
     // The validation for even numbers will happen when creating matches, not when moving players
     console.log(`🎯 Moving ${selectedPlayers.length} player(s) from Main Area to ${targetRound.displayName || targetRound.name}. Target will have ${playersAfterMove} players.`);
     
-    // Show loading state
+    // Show loading state and preserve scroll
+    this.captureScrollPosition();
     this.setState({ loading: true });
   
     try {
@@ -3858,7 +3891,8 @@ selectedRoundDisplayName: '',
       player2Id
     });
     
-    // Show loading state
+    // Show loading state and preserve scroll
+    this.captureScrollPosition();
     this.setState({ loading: true });
     
     try {
@@ -3944,6 +3978,8 @@ selectedRoundDisplayName: '',
         'Error Starting Match',
         `Failed to start match: ${errorMessage}`
       );
+    } finally {
+      this.restoreScrollPosition();
     }
   };
 
@@ -4037,7 +4073,8 @@ selectedRoundDisplayName: '',
         isValidUUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(matchApiId)
       });
       
-      // Show loading state
+      // Show loading state and preserve scroll
+      this.captureScrollPosition();
       this.setState({ loading: true });
       
       const deleteMatchFlag = !giveByeTo;
@@ -4154,6 +4191,8 @@ selectedRoundDisplayName: '',
         'Error Cancelling Match',
         `Failed to cancel match: ${errorMessage}`
       );
+    } finally {
+      this.restoreScrollPosition();
     }
   };
 
@@ -4300,7 +4339,8 @@ selectedRoundDisplayName: '',
       winnerName: winnerPlayer.name
     });
     
-    // Show loading state
+    // Show loading state and preserve scroll position
+    this.captureScrollPosition();
     this.setState({ loading: true });
     
     try {
@@ -4596,6 +4636,8 @@ selectedRoundDisplayName: '',
         'Error Completing Match',
         `Failed to complete match: ${errorMessage}\n\nPlease try again.`
       );
+    } finally {
+      this.restoreScrollPosition();
     }
   };
 
