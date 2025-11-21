@@ -410,6 +410,14 @@ export class TournamentBracket extends BaseComponentComplete<TournamentBracketPr
     return player.displayName || player.name || 'Unknown Player';
   }
 
+  private getPlayerIdentifier(player?: Player | null): string | null {
+    if (!player) {
+      return null;
+    }
+    const id = player.customerProfileId || player.userId || player.id;
+    return id ? id.toString() : null;
+  }
+
   private findMatchById(matchId: string): { match: TournamentMatch; round: TournamentRound } | null {
     for (const round of this.state.rounds) {
       const match = round.matches.find(m => m.id === matchId);
@@ -6680,14 +6688,31 @@ selectedRoundDisplayName: '',
           matchesCreated
         });
 
+        const usedPlayerIds = new Set(playerIds.map(id => id?.toString()));
+
         // Update state with bracket information according to backend format
-        this.setState({
+        this.setState(prevState => ({
           bracketType: bracketType as 'power_of_2',
           bracketSize: bracketSize || null,
           bracketData: response.data,
           isGeneratingBracket: false,
-          showBracketView: true
-        });
+          showBracketView: true,
+          selectedPlayersForBracket: [],
+          currentGameMatch: prevState.currentGameMatch
+            ? {
+                ...prevState.currentGameMatch,
+                allPlayers: prevState.currentGameMatch.allPlayers?.map(player => {
+                  const identifier = this.getPlayerIdentifier(player);
+                  const inBracket = identifier ? usedPlayerIds.has(identifier) : false;
+                  return {
+                    ...player,
+                    selected: false,
+                    status: inBracket ? 'in_round' : player.status
+                  };
+                }) || []
+              }
+            : prevState.currentGameMatch
+        }));
 
         // Reload tournament data to get updated bracket info
         // Load the bracket to display it
@@ -6764,7 +6789,8 @@ selectedRoundDisplayName: '',
           // Convert API rounds to TournamentRound format
           // Handle both direct rounds array and nested rounds array
           const apiRounds = Array.isArray(rounds) ? rounds : (response.data.rounds || []);
-          
+          const bracketPlayerIds = new Set<string>();
+
           const convertedRounds: TournamentRound[] = apiRounds.map((round: any) => {
             // Handle both snake_case and camelCase field names
             const roundId = round.id || round.roundId;
@@ -6774,6 +6800,112 @@ selectedRoundDisplayName: '',
             const roundMatches = round.matches || [];
             const roundByesCount = round.byesCount || round.byes_count || 0;
             
+            const convertedMatches = roundMatches.map((match: any) => {
+              // Handle BYE players - check if player ID is the system BYE player ID
+              const isMatchBye = match.isBye || match.is_bye || false;
+              const player1Id = match.player1?.id || match.player1Id;
+              const player2Id = match.player2?.id || match.player2Id;
+              const isPlayer1Bye = player1Id === BYE_PLAYER_ID || match.player1?.isBye || match.player1?.is_bye;
+              const isPlayer2Bye = player2Id === BYE_PLAYER_ID || match.player2?.isBye || match.player2?.is_bye;
+
+              const player1 = match.player1 && !isPlayer1Bye ? {
+                id: match.player1.id || match.player1.customerProfileId || match.player1Id,
+                name: match.player1.name || match.player1.displayName || match.player1.fullName || 'Player 1',
+                email: match.player1.email || '',
+                skill: match.player1.skillLevel || match.player1.skill || 'Beginner',
+                profilePic: getAvatar(match.player1.profilePic || match.player1.avatar),
+                selected: false,
+                status: isMatchBye ? 'available' : 'in_match',
+                customerProfileId: match.player1.id || match.player1.customerProfileId || match.player1Id
+              } : {
+                id: BYE_PLAYER_ID,
+                name: 'BYE',
+                email: '',
+                skill: '',
+                profilePic: DEFAULT_AVATAR,
+                selected: false,
+                status: 'available' as const,
+                customerProfileId: null
+              };
+
+              const player2 = match.player2 && !isPlayer2Bye ? {
+                id: match.player2.id || match.player2.customerProfileId || match.player2Id,
+                name: match.player2.name || match.player2.displayName || match.player2.fullName || 'Player 2',
+                email: match.player2.email || '',
+                skill: match.player2.skillLevel || match.player2.skill || 'Beginner',
+                profilePic: getAvatar(match.player2.profilePic || match.player2.avatar),
+                selected: false,
+                status: isMatchBye ? 'available' : 'in_match',
+                customerProfileId: match.player2.id || match.player2.customerProfileId || match.player2Id
+              } : (match.player2Id === PLACEHOLDER_PLAYER_ID || !match.player2 ? {
+                id: PLACEHOLDER_PLAYER_ID,
+                name: 'TBD',
+                email: '',
+                skill: '',
+                profilePic: DEFAULT_AVATAR,
+                selected: false,
+                status: 'waiting' as const,
+                customerProfileId: null
+              } : {
+                id: BYE_PLAYER_ID,
+                name: 'BYE',
+                email: '',
+                skill: '',
+                profilePic: DEFAULT_AVATAR,
+                selected: false,
+                status: 'available' as const,
+                customerProfileId: null
+              });
+
+              const winner = match.winner ? {
+                id: match.winner.id || match.winner.customerProfileId,
+                name: match.winner.name || match.winner.displayName || match.winner.fullName,
+                email: match.winner.email || '',
+                skill: match.winner.skillLevel || match.winner.skill || 'Beginner',
+                profilePic: getAvatar(match.winner.profilePic || match.winner.avatar),
+                selected: false,
+                status: 'winner' as const,
+                customerProfileId: match.winner.id || match.winner.customerProfileId
+              } : undefined;
+
+              const addBracketPlayer = (playerObj?: Player) => {
+                const identifier = this.getPlayerIdentifier(playerObj || null);
+                if (identifier) {
+                  bracketPlayerIds.add(identifier);
+                }
+              };
+
+              if (player1.id !== BYE_PLAYER_ID) {
+                addBracketPlayer(player1 as Player);
+              }
+              if (player2.id !== BYE_PLAYER_ID && player2.id !== PLACEHOLDER_PLAYER_ID) {
+                addBracketPlayer(player2 as Player);
+              }
+              if (winner) {
+                addBracketPlayer(winner as Player);
+              }
+
+              return {
+                id: match.id || match.matchId,
+                apiMatchId: match.id || match.matchId,
+                isBye: isMatchBye || isPlayer1Bye || isPlayer2Bye,
+                positionInBracket: match.positionInBracket || match.position_in_bracket,
+                bracketSeed: match.bracketSeed || match.bracket_seed,
+                nextMatchIdForWinner: match.nextMatchIdForWinner || match.next_match_id_for_winner,
+                player1,
+                player2,
+                status: match.status === 'completed' || match.status === 'finished' ? 'completed'
+                  : match.status === 'ongoing' || match.status === 'in_progress' ? 'active'
+                  : 'pending',
+                startTime: match.startTime || match.start_time,
+                endTime: match.endTime || match.end_time,
+                score: match.score || (match.scorePlayer1 !== undefined && match.scorePlayer2 !== undefined
+                  ? `${match.scorePlayer1 || match.score_player1 || 0}-${match.scorePlayer2 || match.score_player2 || 0}`
+                  : undefined),
+                winner
+              };
+            }) || [];
+
             return {
               id: roundId,
               name: roundName,
@@ -6785,88 +6917,7 @@ selectedRoundDisplayName: '',
                 (m.status === 'completed' || m.status === 'finished')
               ).length,
               players: [],
-              matches: roundMatches.map((match: any) => {
-                // Handle BYE players - check if player ID is the system BYE player ID
-                const isMatchBye = match.isBye || match.is_bye || false;
-                const player1Id = match.player1?.id || match.player1Id;
-                const player2Id = match.player2?.id || match.player2Id;
-                const isPlayer1Bye = player1Id === BYE_PLAYER_ID || match.player1?.isBye || match.player1?.is_bye;
-                const isPlayer2Bye = player2Id === BYE_PLAYER_ID || match.player2?.isBye || match.player2?.is_bye;
-                
-                return {
-                  id: match.id || match.matchId,
-                  apiMatchId: match.id || match.matchId,
-                  // Match bracket information
-                  isBye: isMatchBye || isPlayer1Bye || isPlayer2Bye,
-                  positionInBracket: match.positionInBracket || match.position_in_bracket,
-                  bracketSeed: match.bracketSeed || match.bracket_seed,
-                  nextMatchIdForWinner: match.nextMatchIdForWinner || match.next_match_id_for_winner,
-                  player1: match.player1 && !isPlayer1Bye ? {
-                    id: match.player1.id || match.player1.customerProfileId || match.player1Id,
-                    name: match.player1.name || match.player1.displayName || match.player1.fullName || 'Player 1',
-                    email: match.player1.email || '',
-                    skill: match.player1.skillLevel || match.player1.skill || 'Beginner',
-                    profilePic: getAvatar(match.player1.profilePic || match.player1.avatar),
-                    selected: false,
-                    status: isMatchBye ? 'available' : 'in_match',
-                    customerProfileId: match.player1.id || match.player1.customerProfileId || match.player1Id
-                  } : {
-                    id: BYE_PLAYER_ID,
-                    name: 'BYE',
-                    email: '',
-                    skill: '',
-                    profilePic: DEFAULT_AVATAR,
-                    selected: false,
-                    status: 'available' as const,
-                    customerProfileId: null
-                  },
-                  player2: match.player2 && !isPlayer2Bye ? {
-                    id: match.player2.id || match.player2.customerProfileId || match.player2Id,
-                    name: match.player2.name || match.player2.displayName || match.player2.fullName || 'Player 2',
-                    email: match.player2.email || '',
-                    skill: match.player2.skillLevel || match.player2.skill || 'Beginner',
-                    profilePic: getAvatar(match.player2.profilePic || match.player2.avatar),
-                    selected: false,
-                    status: isMatchBye ? 'available' : 'in_match',
-                    customerProfileId: match.player2.id || match.player2.customerProfileId || match.player2Id
-                  } : (match.player2Id === PLACEHOLDER_PLAYER_ID || !match.player2 ? {
-                    id: PLACEHOLDER_PLAYER_ID,
-                    name: 'TBD',
-                    email: '',
-                    skill: '',
-                    profilePic: DEFAULT_AVATAR,
-                    selected: false,
-                    status: 'waiting' as const,
-                    customerProfileId: null
-                  } : {
-                    id: BYE_PLAYER_ID,
-                    name: 'BYE',
-                    email: '',
-                    skill: '',
-                    profilePic: DEFAULT_AVATAR,
-                    selected: false,
-                    status: 'available' as const,
-                    customerProfileId: null
-                  }),
-                  status: match.status === 'completed' || match.status === 'finished' ? 'completed' : 
-                          match.status === 'ongoing' || match.status === 'in_progress' ? 'active' : 'pending',
-                  startTime: match.startTime || match.start_time,
-                  endTime: match.endTime || match.end_time,
-                  score: match.score || (match.scorePlayer1 !== undefined && match.scorePlayer2 !== undefined 
-                    ? `${match.scorePlayer1 || match.score_player1 || 0}-${match.scorePlayer2 || match.score_player2 || 0}`
-                    : undefined),
-                  winner: match.winner ? {
-                    id: match.winner.id || match.winner.customerProfileId,
-                    name: match.winner.name || match.winner.displayName || match.winner.fullName,
-                    email: match.winner.email || '',
-                    skill: match.winner.skillLevel || match.winner.skill || 'Beginner',
-                    profilePic: getAvatar(match.winner.profilePic || match.winner.avatar),
-                    selected: false,
-                    status: 'winner' as const,
-                    customerProfileId: match.winner.id || match.winner.customerProfileId
-                  } : undefined
-                };
-              }) || [],
+              matches: convertedMatches,
               winners: round.winners || [],
               losers: round.losers || [],
               status: round.status || 'pending',
@@ -6882,7 +6933,18 @@ selectedRoundDisplayName: '',
             rounds: convertedRounds,
             currentGameMatch: prevState.currentGameMatch ? {
               ...prevState.currentGameMatch,
-              rounds: convertedRounds
+              rounds: convertedRounds,
+              allPlayers: prevState.currentGameMatch.allPlayers?.map(player => {
+                const identifier = this.getPlayerIdentifier(player);
+                const inBracket = identifier ? bracketPlayerIds.has(identifier) : false;
+                return {
+                  ...player,
+                  selected: false,
+                  status: prevState.bracketType === 'power_of_2' || bracketType === 'power_of_2'
+                    ? (inBracket ? 'in_round' : 'available')
+                    : player.status
+                };
+              }) || prevState.currentGameMatch.allPlayers
             } : null,
             activeRoundTab: firstRoundId || prevState.activeRoundTab,
             activeRoundSubTab: firstRoundId
@@ -7604,6 +7666,11 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
         </div>
       );
     }
+
+    const isBracketMode = this.state.bracketType === 'power_of_2';
+    const allPlayersList = this.state.currentGameMatch?.allPlayers || [];
+    const availablePlayersList = allPlayersList.filter((p: Player) => p.status === 'available');
+    const availablePlayersCount = availablePlayersList.length;
 
     return (
         <div className="min-h-screen" style={{ background: 'linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%)', color: '#ffffff' }}>
@@ -8576,7 +8643,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                      {this.state.currentGameMatch.allPlayers?.filter((p: Player) => p.status === 'available').length || 0} Available
+                      {availablePlayersCount} Available
                     </span>
                     <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
                       {this.state.currentGameMatch.rounds?.length || 0} Rounds
@@ -8619,21 +8686,65 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   
                   {/* Available Players Section */}
-                  <div className="lg:col-span-2">
-                    <div className="flex items-center justify-between mb-4">
+                  <div className="lg:col-span-2 space-y-4">
+                    {isBracketMode && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6 text-blue-900 shadow-inner flex flex-col gap-3">
+                        <div className="flex items-center gap-2">
+                          <Trophy className="w-5 h-5" />
+                          <h3 className="text-lg font-semibold">Bracket Mode Active</h3>
+                        </div>
+                        <p className="text-sm text-blue-800">
+                          Only players already placed in the bracket are locked. Remaining available players stay listed below.
+                          Player selection controls are disabled while the professional bracket is active.
+                        </p>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            onClick={() => this.setState({ showBracketView: true })}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center gap-2"
+                          >
+                            <Trophy className="w-4 h-4" />
+                            View Bracket
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (this.state.currentGameMatch?.tournamentId) {
+                                this.refreshBracketData('manual-refresh');
+                              }
+                            }}
+                            className="px-4 py-2 bg-white text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+                          >
+                            Refresh Bracket Data
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between mb-2">
                       <h3 className="text-lg font-semibold text-gray-900">
-                        Available Players ({this.state.currentGameMatch.allPlayers?.filter((p: Player) => p.status === 'available').length || 0})
+                        Available Players ({availablePlayersCount})
                       </h3>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={this.handleSelectAllPlayers}
-                          className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                          onClick={() => !isBracketMode && this.handleSelectAllPlayers()}
+                          disabled={isBracketMode}
+                          className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                            isBracketMode
+                              ? 'bg-blue-200 text-blue-600 cursor-not-allowed'
+                              : 'bg-blue-600 text-white hover:bg-blue-700'
+                          }`}
+                          title={isBracketMode ? 'Disabled while bracket is active' : 'Select all available players'}
                         >
                           Select All
                         </button>
                         <button
-                          onClick={this.handleDeselectAllPlayers}
-                          className="px-3 py-1 text-sm bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                          onClick={() => !isBracketMode && this.handleDeselectAllPlayers()}
+                          disabled={isBracketMode}
+                          className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                            isBracketMode
+                              ? 'bg-gray-200 text-gray-600 cursor-not-allowed'
+                              : 'bg-gray-600 text-white hover:bg-gray-700'
+                          }`}
+                          title={isBracketMode ? 'Disabled while bracket is active' : 'Deselect all players'}
                         >
                           Deselect All
                         </button>
@@ -8641,17 +8752,24 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                     </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 max-h-96 overflow-y-auto">
-                      {this.state.currentGameMatch.allPlayers
-                        ?.filter((player: Player) => player.status === 'available')
-                        .map((player: Player) => (
-                        <div key={player.id} className={`p-3 rounded-lg border-2 transition-all cursor-pointer group ${
-                          player.selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'
-                        }`} onClick={() => this.handleTogglePlayerSelection(player.id)}>
+                      {availablePlayersList.map((player: Player) => (
+                        <div
+                          key={player.id}
+                          className={`p-3 rounded-lg border-2 transition-all group ${
+                            player.selected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white hover:border-blue-300 hover:bg-blue-50'
+                          } ${isBracketMode ? 'opacity-80' : 'cursor-pointer'}`}
+                          onClick={() => {
+                            if (!isBracketMode) {
+                              this.handleTogglePlayerSelection(player.id);
+                            }
+                          }}
+                        >
                           <div className="flex items-center justify-between mb-2">
                             <input
                               type="checkbox"
                               checked={player.selected}
-                              onChange={() => this.handleTogglePlayerSelection(player.id)}
+                              disabled={isBracketMode}
+                              onChange={() => !isBracketMode && this.handleTogglePlayerSelection(player.id)}
                               className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
                               onClick={(e) => e.stopPropagation()}
                             />
@@ -8682,6 +8800,11 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           </div>
                         </div>
                       ))}
+                      {availablePlayersList.length === 0 && (
+                        <div className="col-span-full text-center text-gray-500 py-6 border-2 border-dashed border-gray-200 rounded-xl">
+                          No additional players are available for selection.
+                        </div>
+                      )}
                     </div>
                   </div>
 
