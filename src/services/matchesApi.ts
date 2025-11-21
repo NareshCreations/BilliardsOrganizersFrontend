@@ -1231,7 +1231,8 @@ class MatchesApiService {
     tournamentId: string,
     roundId: string,
     matchId: string,
-    deleteMatch: boolean = false
+    deleteMatch: boolean = false,
+    giveByeTo?: string
   ): Promise<any> {
     try {
       console.log('❌ Calling cancel match API');
@@ -1240,6 +1241,7 @@ class MatchesApiService {
       console.log('🎲 Round ID:', roundId);
       console.log('🎮 Match ID:', matchId);
       console.log('🗑️ Delete Match:', deleteMatch);
+      console.log('🏅 Give Bye To:', giveByeTo || 'none');
 
       const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/rounds/${roundId}/matches/${matchId}`;
       console.log('📍 Full API URL:', url);
@@ -1251,9 +1253,13 @@ class MatchesApiService {
         throw new Error(`Invalid parameters: tournamentId=${tournamentId}, roundId=${roundId}, matchId=${matchId}`);
       }
 
-      const requestBody = {
-        deleteMatch: deleteMatch
+      const requestBody: Record<string, any> = {
+        deleteMatch
       };
+
+      if (giveByeTo) {
+        requestBody.giveByeTo = giveByeTo;
+      }
 
       const response = await makeAuthenticatedRequest(url, {
         method: 'DELETE',
@@ -1504,6 +1510,268 @@ class MatchesApiService {
       return data;
     } catch (error) {
       console.error('❌ Error closing tournament:', error);
+      throw error;
+    }
+  }
+
+  // Generate Bracket API
+  // POST /api/v1/organizers/tournaments/:tournamentId/generate-bracket
+  // Requires Authorization Bearer token in header
+  async generateBracket(tournamentId: string, playerIds: string[]): Promise<any> {
+    try {
+      console.log('🎯 Calling generate bracket API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      console.log('👥 Player IDs:', playerIds);
+      
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/generate-bracket`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: POST');
+      console.log('🔐 Using Authorization Bearer token from authService');
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ playerIds }),
+      });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        console.log('❌ Unauthorized request (401), token expired or invalid');
+        console.log('🔐 Logging out user and redirecting to login page...');
+        forceRedirectToLogin();
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+        console.error('❌ Response status:', response.status);
+        console.error('❌ Response URL:', url);
+        
+        // Check if response is HTML (like "Cannot POST" error page)
+        if (errorText.trim().startsWith('<!DOCTYPE') || errorText.trim().startsWith('<html') || errorText.includes('Cannot POST')) {
+          if (response.status === 404) {
+            throw new Error(`Endpoint not found (404): The backend route POST /api/v1/organizers/tournaments/:tournamentId/generate-bracket is not configured. Please ensure the backend server has this route registered.`);
+          } else {
+            throw new Error(`Server error (${response.status}): The bracket generation endpoint is not available. Please check if the backend server is running and the route is configured.`);
+          }
+        }
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          // If not JSON, use the error text or status
+          errorData = { message: errorText || `HTTP error! status: ${response.status}` };
+        }
+        
+        throw new Error(errorData.message || errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Bracket generated successfully');
+      console.log('📦 Response data:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Generate bracket API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      throw error;
+    }
+  }
+
+  // Get Bracket API
+  // GET /api/v1/organizers/tournaments/:tournamentId/bracket
+  // Requires Authorization Bearer token in header
+  async getBracket(tournamentId: string): Promise<any> {
+    try {
+      console.log('📊 Calling get bracket API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/bracket`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: GET');
+      console.log('🔐 Using Authorization Bearer token from authService');
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        console.log('❌ Unauthorized request (401), token expired or invalid');
+        console.log('🔐 Logging out user and redirecting to login page...');
+        forceRedirectToLogin();
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Bracket retrieved successfully');
+      console.log('📦 Response data:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Get bracket API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      throw error;
+    }
+  }
+
+  // Get Bracket Status API
+  // GET /api/v1/organizers/tournaments/:tournamentId/bracket/status
+  // Requires Authorization Bearer token in header
+  async getBracketStatus(tournamentId: string): Promise<any> {
+    try {
+      console.log('📈 Calling get bracket status API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/bracket/status`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: GET');
+      console.log('🔐 Using Authorization Bearer token from authService');
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        console.log('❌ Unauthorized request (401), token expired or invalid');
+        console.log('🔐 Logging out user and redirecting to login page...');
+        forceRedirectToLogin();
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Bracket status retrieved successfully');
+      console.log('📦 Response data:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Get bracket status API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
+      throw error;
+    }
+  }
+
+  // Delete Bracket API
+  // DELETE /api/v1/organizers/tournaments/:tournamentId/bracket
+  // Requires Authorization Bearer token in header
+  async deleteBracket(tournamentId: string): Promise<any> {
+    try {
+      console.log('🗑️ Calling delete bracket API');
+      console.log('🌐 API Base URL:', this.apiBaseUrl);
+      console.log('🏆 Tournament ID:', tournamentId);
+      
+      const url = `${this.apiBaseUrl}/organizers/tournaments/${tournamentId}/bracket`;
+      console.log('📍 Full API URL:', url);
+      console.log('🔐 Request method: DELETE');
+      console.log('🔐 Using Authorization Bearer token from authService');
+      
+      const response = await makeAuthenticatedRequest(url, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
+
+      // Handle 401 Unauthorized - redirect to login
+      if (response.status === 401) {
+        console.log('❌ Unauthorized request (401), token expired or invalid');
+        console.log('🔐 Logging out user and redirecting to login page...');
+        forceRedirectToLogin();
+        throw new Error('Session expired. Please login again.');
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API error response:', errorText);
+        
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { message: errorText };
+        }
+        
+        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('✅ Bracket deleted successfully');
+      console.log('📦 Response data:', data);
+      
+      return data;
+    } catch (error) {
+      console.error('❌ Delete bracket API error:', error);
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        name: error instanceof Error ? error.name : 'Unknown'
+      });
+      
       throw error;
     }
   }

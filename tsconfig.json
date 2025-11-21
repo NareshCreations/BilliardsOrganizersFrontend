@@ -21,7 +21,7 @@
   "include": ["src", "src/types"],
   "exclude": [
     "src/components/pages/Matches - Today - V1.tsx",
-    "src/components/pages/Matches copy.tsx",
+    "src/components/pages/Matches-8-Nov-2025 V1.tsx",
     "src/components/pages/Matches.tsx.backup",
     "**/*.backup",
     "**/* copy.*",

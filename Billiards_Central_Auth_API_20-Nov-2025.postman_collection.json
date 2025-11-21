@@ -2,7 +2,7 @@
 	"info": {
 		"_postman_id": "billiards-central-auth-api",
 		"name": "Billiards Central Auth API - 18-Nov-2025",
-		"description": "Complete API collection for Billiards Central Authentication Service (Local Development).\n\n**Deployment:**\n- Base URL: http://localhost:3005\n- Environment: Local Development\n\n**Features:**\n- User Registration (Email, Phone, Org ID)\n- Authentication (Customer & Organizer login with email, phone, or org_id)\n- Tournament management (Create tournament, Get tournaments, Delete tournament, Get status, Start tournament, Close tournament, Get registered players, Get tournament, Create rounds, Update round, Move players to round, Remove players from round, Move players between rounds, Delete round, Start match, Complete match, Cancel/Delete match, Save winner titles)\n- Customer portal (Get tournament, Register for tournament, Get profile, Update profile with Cloudinary file upload)\n- Organizer portal (Get profile, Update profile with Cloudinary file upload)\n- Public endpoints (Get active organizers, Get organizer tournaments)\n- Token-based authentication (Header or Body)\n- Automatic variable management (access_token, tournament_id, organizer_id, round_id, from_round_id, to_round_id, match_id)\n- Cloudinary integration for profile picture uploads\n\n**Usage:**\n1. Register users using 'Register Customer' or 'Register Organizer'\n2. Login to authenticate and get tokens\n3. Tokens are automatically saved to collection variables\n4. Create tournaments using 'Create Tournament' API (tournament ID auto-generated if not provided)\n5. Tournament IDs are automatically captured for easy testing\n6. Start tournament before creating rounds (tournament status must be 'started')\n7. Create rounds, then move registered players to specific rounds\n8. Update rounds with matches and player details using 'Update Round' API (can create/update/delete matches in one request)\n9. Remove players from rounds as needed\n10. Move players between rounds using atomic transaction\n11. Delete rounds if needed (all related matches and participants will be deleted via CASCADE)\n12. Start matches between players in a round (both players must be in the round)\n13. Complete matches by selecting winner and entering scores\n14. Cancel or delete matches (cancel sets status to 'cancelled', delete physically removes the match)\n15. Save winner titles with rankings and custom titles\n16. Close tournament when completed\n17. Delete tournament if needed (all related data will be deleted via CASCADE)\n18. Customers can get tournament details using 'Get Tournament' API\n19. Customers can register for tournaments using 'Register for Tournament' API\n20. Customers can get their profile using 'Get Profile' API\n21. Customers can update their profile using 'Update Profile' API (all fields optional, supports file upload via Cloudinary)\n22. Organizers can get their profile using 'Get Profile' API\n23. Organizers can update their profile using 'Update Profile' API (all fields optional, supports file upload via Cloudinary)",
+		"description": "Complete API collection for Billiards Central Authentication Service (Local Development).\n\n**Deployment:**\n- Base URL: http://localhost:3005\n- Environment: Local Development\n\n**Features:**\n- User Registration (Email, Phone, Org ID)\n- Authentication (Customer & Organizer login with email, phone, or org_id)\n- Tournament management (Create tournament, Get tournaments, Delete tournament, Get status, Start tournament, Close tournament, Get registered players, Get tournament, Create rounds, Update round, Move players to round, Remove players from round, Move players between rounds, Delete round, Start match, Complete match, Cancel/Delete match, Save winner titles)\n- **Bracket System** (Generate bracket, Get bracket, Get bracket status, Delete bracket) - Professional power-of-2 bracket with automatic advancement\n- Customer portal (Get tournament, Register for tournament, Get profile, Update profile with Cloudinary file upload)\n- Organizer portal (Get profile, Update profile with Cloudinary file upload)\n- Public endpoints (Get active organizers, Get organizer tournaments)\n- Token-based authentication (Header or Body)\n- Automatic variable management (access_token, tournament_id, organizer_id, round_id, from_round_id, to_round_id, match_id)\n- Cloudinary integration for profile picture uploads\n\n**Bracket System:**\n- Generate complete power-of-2 bracket (8, 16, 32, 64 players)\n- Automatic bye assignment in Round 1 only\n- Auto-advancement of winners to next matches\n- Professional tournament bracket structure\n- Works alongside manual tournament system (backward compatible)\n\n**Usage:**\n1. Register users using 'Register Customer' or 'Register Organizer'\n2. Login to authenticate and get tokens\n3. Tokens are automatically saved to collection variables\n4. Create tournaments using 'Create Tournament' API (tournament ID auto-generated if not provided)\n5. Tournament IDs are automatically captured for easy testing\n6. Start tournament before creating rounds (tournament status must be 'started')\n7. Create rounds, then move registered players to specific rounds\n8. Update rounds with matches and player details using 'Update Round' API (can create/update/delete matches in one request)\n9. Remove players from rounds as needed\n10. Move players between rounds using atomic transaction\n11. Delete rounds if needed (all related matches and participants will be deleted via CASCADE)\n12. Start matches between players in a round (both players must be in the round)\n13. Complete matches by selecting winner and entering scores\n14. Cancel or delete matches (cancel sets status to 'cancelled', delete physically removes the match)\n15. Save winner titles with rankings and custom titles\n16. Close tournament when completed\n17. Delete tournament if needed (all related data will be deleted via CASCADE)\n18. Customers can get tournament details using 'Get Tournament' API\n19. Customers can register for tournaments using 'Register for Tournament' API\n20. Customers can get their profile using 'Get Profile' API\n21. Customers can update their profile using 'Update Profile' API (all fields optional, supports file upload via Cloudinary)\n22. Organizers can get their profile using 'Get Profile' API\n23. Organizers can update their profile using 'Update Profile' API (all fields optional, supports file upload via Cloudinary)",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
 		"_exporter_id": "billiards-auth",
 		"version": "1.0.0"
@@ -1377,7 +1377,7 @@
 								"{{tournament_id}}"
 							]
 						},
-						"description": "Get tournament with basic details, registered players, and tournament_status object. Returns tournament object (id, name, status, dates, fees, etc.), players array (same as Get Registered Players API), and a rich tournament_status payload (tournament overview, rounds, matches, winners podium). Requires a valid organizer token and tournament ownership."
+						"description": "Get tournament with basic details, registered players, and tournament_status object. Returns tournament object (id, name, status, dates, fees, etc.), players array (same as Get Registered Players API), and a rich tournament_status payload (tournament overview, rounds, matches, winners podium). Requires a valid organizer token and tournament ownership.\n\n**Bracket Information (NEW):**\n- Tournament object includes: `bracketType` (null or 'power_of_2'), `bracketSize` (8, 16, 32, 64, etc.), `bracketGeneratedAt` (timestamp)\n- Tournament status object includes: `bracket_type`, `bracket_size`, `bracket_generated_at`\n- Each match includes: `isBye` (boolean), `positionInBracket` (number), `bracketSeed` (number), `nextMatchIdForWinner` (uuid)\n- Each round includes: `byesCount` (number of bye matches in round)\n\n**Note:** Bracket fields are `null` for manual tournaments. For bracket tournaments, all bracket information is included in the response."
 					},
 					"response": [
 						{
@@ -1392,7 +1392,7 @@
 								}
 							],
 							"cookie": [],
-							"body": "{\n  \"success\": true,\n  \"message\": \"Tournament fetched successfully\",\n  \"data\": {\n    \"tournament\": {\n      \"id\": \"f79a142b-d6ae-4c6a-b38e-23ca34ad570e\",\n      \"tournamentId\": \"TOUR0001\",\n      \"tournamentName\": \"Mumbai Open 8-Ball Championship\",\n      \"gameType\": \"8-ball\",\n      \"tournamentDate\": \"2025-11-17\",\n      \"tournamentTime\": \"14:00:00\",\n      \"registrationDeadline\": \"2025-11-16T23:59:59.000Z\",\n      \"status\": \"started\",\n      \"registeredCount\": 20,\n      \"maxPlayers\": 64,\n      \"entryFee\": 750.00,\n      \"prizePool\": 10000.00,\n      \"startedAt\": \"2025-11-17T14:00:00.000Z\",\n      \"endedAt\": null,\n      \"description\": \"Annual championship tournament\"\n    },\n    \"players\": [\n      {\n        \"registrationId\": \"5ba8ad72-f92c-44ea-8d0a-8d5460e7ff69\",\n        \"registrationDate\": \"2025-11-04T22:32:56.490Z\",\n        \"paymentStatus\": \"paid\",\n        \"paymentAmount\": 750,\n        \"paymentMethod\": \"upi\",\n        \"registrationStatus\": \"registered\",\n        \"userId\": \"607a9248-82d2-4d1a-8804-c30786f5b4c6\",\n        \"customerProfileId\": \"a6f6fbae-1b2d-4a39-b187-3ce813875afb\",\n        \"firstName\": \"neha\",\n        \"lastName\": \"joshi@example\",\n        \"fullName\": \"neha joshi@example\",\n        \"email\": \"neha.joshi@example.com\",\n        \"phone\": \"9095635670\",\n        \"profilePic\": \"https://i.pravatar.cc/400?img=14\",\n        \"skillLevel\": \"beginner\",\n        \"rating\": 938,\n        \"city\": \"Mumbai\",\n        \"state\": \"Maharashtra\",\n        \"country\": \"India\",\n        \"isVerified\": true,\n        \"userCreatedAt\": \"2025-11-03T09:30:37.944Z\"\n      }\n    ],\n    \"tournament_status\": {\n      \"tournament\": {\n        \"code\": \"tour_mum_8ball_001\",\n        \"name\": \"Mumbai Open 8-Ball Championship\",\n        \"game_type\": \"8-ball\",\n        \"date\": \"2025-11-17\",\n        \"status\": \"in_progress\",\n        \"registered\": 20,\n        \"max_players\": 64\n      },\n      \"rounds\": [\n        {\n          \"round_number\": 1,\n          \"display_name\": \"Round of 32\",\n          \"status\": \"completed\",\n          \"total_matches\": 10,\n          \"completed_matches\": 10,\n          \"players\": [\n            {\n              \"player_id\": \"uuid1\",\n              \"name\": \"Rahul Verma\",\n              \"email\": \"rahul@example.com\",\n              \"seed\": 1,\n              \"is_bye\": false,\n              \"advanced_from\": null\n            }\n          ],\n          \"matches\": [\n            {\n              \"match_number\": 1,\n              \"status\": \"completed\",\n              \"score\": \"7-4\",\n              \"table_number\": 1,\n              \"start_time\": \"2025-11-17T10:00:00Z\",\n              \"end_time\": \"2025-11-17T10:45:00Z\",\n              \"player1\": {\n                \"id\": \"uuid1\",\n                \"name\": \"Rahul Verma\",\n                \"email\": \"rahul@example.com\"\n              },\n              \"player2\": {\n                \"id\": \"uuid3\",\n                \"name\": \"Amit Singh\",\n                \"email\": \"amit@example.com\"\n              },\n              \"winner\": {\n                \"id\": \"uuid1\",\n                \"name\": \"Rahul Verma\"\n              }\n            }\n          ]\n        }\n      ],\n      \"winners_podium\": [\n        { \"rank\": 1, \"name\": \"Rahul Verma\", \"title\": \"Champion\" },\n        { \"rank\": 2, \"name\": \"Priya Patel\", \"title\": \"Runner Up\" },\n        { \"rank\": 3, \"name\": \"Vishal Kumar\", \"title\": \"Semi Finalist\" }\n      ]\n    },\n    \"count\": 20\n  }\n}"
+							"body": "{\n  \"success\": true,\n  \"message\": \"Tournament fetched successfully\",\n  \"data\": {\n    \"tournament\": {\n      \"id\": \"f79a142b-d6ae-4c6a-b38e-23ca34ad570e\",\n      \"tournamentId\": \"TOUR0001\",\n      \"tournamentName\": \"Mumbai Open 8-Ball Championship\",\n      \"gameType\": \"8-ball\",\n      \"tournamentDate\": \"2025-11-17\",\n      \"tournamentTime\": \"14:00:00\",\n      \"registrationDeadline\": \"2025-11-16T23:59:59.000Z\",\n      \"status\": \"started\",\n      \"registeredCount\": 20,\n      \"maxPlayers\": 64,\n      \"entryFee\": 750.00,\n      \"prizePool\": 10000.00,\n      \"startedAt\": \"2025-11-17T14:00:00.000Z\",\n      \"endedAt\": null,\n      \"description\": \"Annual championship tournament\",\n      \"bracketType\": null,\n      \"bracketSize\": null,\n      \"bracketGeneratedAt\": null\n    },\n    \"players\": [\n      {\n        \"registrationId\": \"5ba8ad72-f92c-44ea-8d0a-8d5460e7ff69\",\n        \"registrationDate\": \"2025-11-04T22:32:56.490Z\",\n        \"paymentStatus\": \"paid\",\n        \"paymentAmount\": 750,\n        \"paymentMethod\": \"upi\",\n        \"registrationStatus\": \"registered\",\n        \"userId\": \"607a9248-82d2-4d1a-8804-c30786f5b4c6\",\n        \"customerProfileId\": \"a6f6fbae-1b2d-4a39-b187-3ce813875afb\",\n        \"firstName\": \"neha\",\n        \"lastName\": \"joshi@example\",\n        \"fullName\": \"neha joshi@example\",\n        \"email\": \"neha.joshi@example.com\",\n        \"phone\": \"9095635670\",\n        \"profilePic\": \"https://i.pravatar.cc/400?img=14\",\n        \"skillLevel\": \"beginner\",\n        \"rating\": 938,\n        \"city\": \"Mumbai\",\n        \"state\": \"Maharashtra\",\n        \"country\": \"India\",\n        \"isVerified\": true,\n        \"userCreatedAt\": \"2025-11-03T09:30:37.944Z\"\n      }\n    ],\n    \"tournament_status\": {\n      \"tournament\": {\n        \"code\": \"tour_mum_8ball_001\",\n        \"name\": \"Mumbai Open 8-Ball Championship\",\n        \"game_type\": \"8-ball\",\n        \"date\": \"2025-11-17\",\n        \"status\": \"in_progress\",\n        \"registered\": 20,\n        \"max_players\": 64,\n        \"bracket_type\": null,\n        \"bracket_size\": null,\n        \"bracket_generated_at\": null\n      },\n      \"rounds\": [\n        {\n          \"round_number\": 1,\n          \"display_name\": \"Round of 32\",\n          \"status\": \"completed\",\n          \"total_matches\": 10,\n          \"completed_matches\": 10,\n          \"players\": [\n            {\n              \"player_id\": \"uuid1\",\n              \"name\": \"Rahul Verma\",\n              \"email\": \"rahul@example.com\",\n              \"seed\": 1,\n              \"is_bye\": false,\n              \"advanced_from\": null\n            }\n          ],\n          \"matches\": [\n            {\n              \"match_number\": 1,\n              \"status\": \"completed\",\n              \"score\": \"7-4\",\n              \"table_number\": 1,\n              \"start_time\": \"2025-11-17T10:00:00Z\",\n              \"end_time\": \"2025-11-17T10:45:00Z\",\n              \"player1\": {\n                \"id\": \"uuid1\",\n                \"name\": \"Rahul Verma\",\n                \"email\": \"rahul@example.com\"\n              },\n              \"player2\": {\n                \"id\": \"uuid3\",\n                \"name\": \"Amit Singh\",\n                \"email\": \"amit@example.com\"\n              },\n              \"winner\": {\n                \"id\": \"uuid1\",\n                \"name\": \"Rahul Verma\"\n              }\n            }\n          ]\n        }\n      ],\n      \"winners_podium\": [\n        { \"rank\": 1, \"name\": \"Rahul Verma\", \"title\": \"Champion\" },\n        { \"rank\": 2, \"name\": \"Priya Patel\", \"title\": \"Runner Up\" },\n        { \"rank\": 3, \"name\": \"Vishal Kumar\", \"title\": \"Semi Finalist\" }\n      ]\n    },\n    \"count\": 20\n  }\n}"
 						},
 						{
 							"name": "Tournament Not Found",
@@ -1435,6 +1435,20 @@
 							],
 							"cookie": [],
 							"body": "{\n  \"success\": false,\n  \"message\": \"Invalid or expired token\"\n}"
+						},
+						{
+							"name": "Success Response - Bracket Tournament",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								}
+							],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"message\": \"Tournament fetched successfully\",\n  \"data\": {\n    \"tournament\": {\n      \"id\": \"f79a142b-d6ae-4c6a-b38e-23ca34ad570e\",\n      \"tournamentId\": \"SPRING-2025-001\",\n      \"tournamentName\": \"Spring Championship 2025\",\n      \"gameType\": \"8-ball\",\n      \"tournamentDate\": \"2025-12-15\",\n      \"tournamentTime\": \"10:00:00\",\n      \"registrationDeadline\": \"2025-12-10T23:59:59.000Z\",\n      \"status\": \"started\",\n      \"registeredCount\": 10,\n      \"maxPlayers\": 16,\n      \"entryFee\": 50.00,\n      \"prizePool\": 800.00,\n      \"startedAt\": \"2025-12-15T10:00:00.000Z\",\n      \"endedAt\": null,\n      \"description\": \"Professional 8-ball tournament\",\n      \"bracketType\": \"power_of_2\",\n      \"bracketSize\": 16,\n      \"bracketGeneratedAt\": \"2025-12-15T10:05:00Z\"\n    },\n    \"players\": [...],\n    \"tournament_status\": {\n      \"tournament\": {\n        \"code\": \"SPRING-2025-001\",\n        \"name\": \"Spring Championship 2025\",\n        \"game_type\": \"8-ball\",\n        \"date\": \"2025-12-15\",\n        \"status\": \"started\",\n        \"registered\": 10,\n        \"max_players\": 16,\n        \"bracket_type\": \"power_of_2\",\n        \"bracket_size\": 16,\n        \"bracket_generated_at\": \"2025-12-15T10:05:00Z\"\n      },\n      \"rounds\": [\n        {\n          \"id\": \"round-uuid-1\",\n          \"name\": \"Round 1\",\n          \"roundNumber\": 1,\n          \"byesCount\": 6,\n          \"matches\": [\n            {\n              \"id\": \"match-uuid-1\",\n              \"matchNumber\": 1,\n              \"status\": \"completed\",\n              \"isBye\": false,\n              \"positionInBracket\": 1,\n              \"bracketSeed\": 1,\n              \"nextMatchIdForWinner\": \"match-uuid-9\",\n              \"player1\": { \"id\": \"player-uuid-1\", \"name\": \"John Doe\" },\n              \"player2\": { \"id\": \"player-uuid-2\", \"name\": \"Jane Smith\" },\n              \"winner\": { \"id\": \"player-uuid-1\", \"name\": \"John Doe\" }\n            },\n            {\n              \"id\": \"match-uuid-3\",\n              \"matchNumber\": 3,\n              \"status\": \"completed\",\n              \"isBye\": true,\n              \"positionInBracket\": 3,\n              \"bracketSeed\": 3,\n              \"nextMatchIdForWinner\": \"match-uuid-10\",\n              \"player1\": { \"id\": \"player-uuid-3\", \"name\": \"Player C\" },\n              \"player2\": { \"id\": \"00000000-0000-0000-0000-000000000001\", \"name\": \"BYE\", \"isBye\": true },\n              \"winner\": { \"id\": \"player-uuid-3\", \"name\": \"Player C\" }\n            }\n          ]\n        }\n      ]\n    }\n  }\n}"
 						}
 					]
 				},
@@ -2685,6 +2699,178 @@
 							"header": [ { "key": "Content-Type", "value": "application/json" } ],
 							"cookie": [],
 							"body": "{\n  \"success\": false,\n  \"message\": \"User is not an organizer\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Generate Bracket",
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" },
+							{ "key": "Authorization", "value": "Bearer {{access_token}}" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"playerIds\": [\n    \"player-uuid-1\",\n    \"player-uuid-2\",\n    \"player-uuid-3\",\n    \"player-uuid-4\",\n    \"player-uuid-5\",\n    \"player-uuid-6\",\n    \"player-uuid-7\",\n    \"player-uuid-8\",\n    \"player-uuid-9\",\n    \"player-uuid-10\"\n  ]\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/v1/organizers/tournaments/{{tournament_id}}/generate-bracket",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "organizers", "tournaments", "{{tournament_id}}", "generate-bracket" ]
+						},
+						"description": "Generate complete power-of-2 bracket for tournament. Creates all rounds and matches automatically with proper seeding, byes, and match linking.\n\n**Prerequisites:**\n- Tournament must be in 'started' status\n- Tournament must not already have a bracket (bracket_type must be NULL)\n- All playerIds must be registered in the tournament\n\n**Request Body:**\n- `playerIds` (array, required): Array of customer_profile IDs or user IDs to include in bracket\n\n**What This Does:**\n- Calculates bracket size (next power of 2: 8, 16, 32, 64...)\n- Shuffles players once at the beginning\n- Creates ALL rounds and matches automatically\n- Assigns byes in Round 1 only (if needed)\n- Links matches (winner → next match)\n- Auto-advances players with byes\n\n**Example with 10 Players:**\n- Bracket Size: 16 (next power of 2)\n- Byes: 6 (16 - 10 = 6)\n- Rounds: 4 (log2(16) = 4)\n- Round 1 Matches: 8 (4 real matches, 6 byes)\n- Total Matches: 15 (16 - 1 = 15)\n\n**Response:**\n- `bracketType`: 'power_of_2'\n- `bracketSize`: Calculated bracket size\n- `totalPlayers`: Number of players in bracket\n- `byes`: Number of byes in Round 1\n- `rounds`: Number of rounds\n- `matchesCreated`: Total matches created\n- `bracketGeneratedAt`: Timestamp\n\n**Note:** This can only be called once per tournament. To regenerate, delete bracket first."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"message\": \"Bracket generated successfully\",\n  \"data\": {\n    \"tournamentId\": \"tournament-uuid\",\n    \"bracketType\": \"power_of_2\",\n    \"bracketSize\": 16,\n    \"totalPlayers\": 10,\n    \"byes\": 6,\n    \"rounds\": 4,\n    \"matchesCreated\": 15,\n    \"bracketGeneratedAt\": \"2025-12-15T10:05:00Z\"\n  }\n}"
+						},
+						{
+							"name": "Bad Request - Tournament Not Started",
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Tournament must be started before generating bracket\"\n}"
+						},
+						{
+							"name": "Bad Request - Bracket Already Exists",
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Bracket already exists for this tournament. Delete bracket first to regenerate.\"\n}"
+						},
+						{
+							"name": "Bad Request - Invalid Player IDs",
+							"status": "Bad Request",
+							"code": 400,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"playerIds array is required\"\n}"
+						},
+						{
+							"name": "Not Found - Tournament",
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Tournament not found\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Bracket",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{access_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/organizers/tournaments/{{tournament_id}}/bracket",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "organizers", "tournaments", "{{tournament_id}}", "bracket" ]
+						},
+						"description": "Get complete bracket view with all rounds and matches in tree structure. Returns bracket data organized by rounds with match connections.\n\n**Response Structure:**\n- `tournament`: Tournament info with bracket details\n- `rounds`: Array of rounds with matches\n  - Each round contains matches with bracket information\n  - `isBye`: Boolean indicating if match has bye\n  - `positionInBracket`: Position in bracket tree (1-based)\n  - `bracketSeed`: Seed number\n  - `nextMatchIdForWinner`: Next match winner advances to\n\n**Bracket Fields in Response:**\n- Tournament: `bracketType`, `bracketSize`, `bracketGeneratedAt`\n- Match: `isBye`, `positionInBracket`, `bracketSeed`, `nextMatchIdForWinner`\n- Round: `byesCount`\n\n**Note:** Returns 404 if bracket doesn't exist for tournament."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": {\n    \"tournament\": {\n      \"id\": \"tournament-uuid\",\n      \"tournamentId\": \"SPRING-2025-001\",\n      \"tournamentName\": \"Spring Championship 2025\",\n      \"bracketType\": \"power_of_2\",\n      \"bracketSize\": 16,\n      \"bracketGeneratedAt\": \"2025-12-15T10:05:00Z\"\n    },\n    \"rounds\": [\n      {\n        \"id\": \"round-uuid-1\",\n        \"name\": \"Round 1\",\n        \"roundNumber\": 1,\n        \"byesCount\": 6,\n        \"matches\": [\n          {\n            \"id\": \"match-uuid-1\",\n            \"matchNumber\": 1,\n            \"status\": \"completed\",\n            \"isBye\": false,\n            \"positionInBracket\": 1,\n            \"bracketSeed\": 1,\n            \"nextMatchIdForWinner\": \"match-uuid-9\",\n            \"player1\": { \"id\": \"player-uuid-1\", \"name\": \"John Doe\" },\n            \"player2\": { \"id\": \"player-uuid-2\", \"name\": \"Jane Smith\" },\n            \"winner\": { \"id\": \"player-uuid-1\", \"name\": \"John Doe\" }\n          },\n          {\n            \"id\": \"match-uuid-3\",\n            \"matchNumber\": 3,\n            \"status\": \"completed\",\n            \"isBye\": true,\n            \"positionInBracket\": 3,\n            \"bracketSeed\": 3,\n            \"nextMatchIdForWinner\": \"match-uuid-10\",\n            \"player1\": { \"id\": \"player-uuid-3\", \"name\": \"Player C\" },\n            \"player2\": { \"id\": \"00000000-0000-0000-0000-000000000001\", \"name\": \"BYE\", \"isBye\": true },\n            \"winner\": { \"id\": \"player-uuid-3\", \"name\": \"Player C\" }\n          }\n        ]\n      }\n    ]\n  }\n}"
+						},
+						{
+							"name": "Not Found - Bracket",
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Bracket not found for this tournament\"\n}"
+						}
+					]
+				},
+				{
+					"name": "Get Bracket Status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{access_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/organizers/tournaments/{{tournament_id}}/bracket/status",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "organizers", "tournaments", "{{tournament_id}}", "bracket", "status" ]
+						},
+						"description": "Get bracket generation status and information. Quick check to see if bracket exists and get bracket details.\n\n**Response:**\n- `hasBracket`: Boolean indicating if bracket exists\n- `bracketType`: Type of bracket ('power_of_2' or null)\n- `bracketSize`: Size of bracket (8, 16, 32, 64, etc.)\n- `bracketGeneratedAt`: Timestamp when bracket was generated\n\n**Use Case:**\n- Check if bracket exists before generating\n- Display bracket info in UI\n- Determine if tournament is manual or bracket type"
+					},
+					"response": [
+						{
+							"name": "Success - Bracket Exists",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": {\n    \"hasBracket\": true,\n    \"bracketType\": \"power_of_2\",\n    \"bracketSize\": 16,\n    \"bracketGeneratedAt\": \"2025-12-15T10:05:00Z\"\n  }\n}"
+						},
+						{
+							"name": "Success - No Bracket",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"data\": {\n    \"hasBracket\": false,\n    \"bracketType\": null,\n    \"bracketSize\": null,\n    \"bracketGeneratedAt\": null\n  }\n}"
+						}
+					]
+				},
+				{
+					"name": "Delete Bracket",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{ "key": "Authorization", "value": "Bearer {{access_token}}" }
+						],
+						"url": {
+							"raw": "{{base_url}}/api/v1/organizers/tournaments/{{tournament_id}}/bracket",
+							"host": [ "{{base_url}}" ],
+							"path": [ "api", "v1", "organizers", "tournaments", "{{tournament_id}}", "bracket" ]
+						},
+						"description": "Delete bracket system and revert tournament to manual mode. Deletes all bracket-linked matches and resets bracket fields.\n\n**What This Does:**\n- Deletes all matches with bracket links (nextMatchIdForWinner, positionInBracket, etc.)\n- Resets tournament bracket fields: `bracket_type`, `bracket_size`, `bracket_generated_at` to NULL\n- Tournament reverts to manual mode\n- Existing manual rounds remain untouched\n\n**Use Cases:**\n- Regenerate bracket with different players\n- Switch from bracket to manual tournament\n- Remove bracket system if needed\n\n**Warning:** This action cannot be undone. All bracket matches will be permanently deleted."
+					},
+					"response": [
+						{
+							"name": "Success",
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": true,\n  \"message\": \"Bracket deleted successfully\",\n  \"data\": {\n    \"tournamentId\": \"tournament-uuid\",\n    \"matchesDeleted\": 15,\n    \"bracketType\": null,\n    \"bracketSize\": null\n  }\n}"
+						},
+						{
+							"name": "Not Found - Bracket",
+							"status": "Not Found",
+							"code": 404,
+							"_postman_previewlanguage": "json",
+							"header": [ { "key": "Content-Type", "value": "application/json" } ],
+							"cookie": [],
+							"body": "{\n  \"success\": false,\n  \"message\": \"Bracket not found for this tournament\"\n}"
 						}
 					]
 				},

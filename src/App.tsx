@@ -5,6 +5,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import { Homepage } from './components/Homepage';
 import { OrganizerDashboard } from './components/Dashboard';
 import { Matches } from './components/pages/Matches';
+import { TournamentBracket } from './components/pages/TournamentBracket';
 import { Signup } from './pages/Auth';
 import Login from './components/auth/Login';
 import { Dashboard, BarDashboard } from './pages/Dashboard';
@@ -109,6 +110,14 @@ class App extends Component {
               element={
                 <ProtectedRoute>
                   <Matches />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/tournament-bracket" 
+              element={
+                <ProtectedRoute>
+                  <TournamentBracket />
                 </ProtectedRoute>
               } 
             />
