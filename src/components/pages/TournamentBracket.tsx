@@ -740,10 +740,10 @@ selectedRoundDisplayName: '',
 
         // Show notification for completed matches
         if (data.status === 'completed') {
-          this.showCustomAlert(
+          /*this.showCustomAlert(
             'Match Completed',
             `Match ${data.matchNumber || data.matchId} has been completed!`
-          );
+          );*/
 
           this.queueBracketRefresh('socket-match-completed');
         } else if (data.status === 'ongoing') {
@@ -858,12 +858,16 @@ selectedRoundDisplayName: '',
    */
   private isSessionExpiredError(error: any): boolean {
     const errorMessage = error instanceof Error ? error.message : String(error || '');
-    return errorMessage.includes('Session expired') || 
-           errorMessage.includes('Unauthorized') || 
-           errorMessage.includes('401') ||
-           errorMessage.includes('Invalid or expired token') ||
-           errorMessage.includes('token expired') ||
-           errorMessage.includes('expired token');
+    const errorString = errorMessage.toLowerCase();
+    return errorString.includes('session expired') || 
+           errorString.includes('unauthorized') ||
+           errorString.includes('401') ||
+           errorString.includes('invalid or expired token') ||
+           errorString.includes('token expired') ||
+           errorString.includes('expired token') ||
+           errorString.includes('please login again') ||
+           errorString.includes('token is invalid') ||
+           errorString.includes('authentication failed');
   }
 
   /**
@@ -873,17 +877,28 @@ selectedRoundDisplayName: '',
     if (this.isSessionExpiredError(error)) {
       console.log('🔐 Session expired, redirecting to login...');
       authService.logout();
+      // Redirect immediately - don't show any alerts
       // Use replace instead of href to prevent back button navigation
-      setTimeout(() => {
-        if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-          window.location.replace('/login');
-        }
-      }, 0);
+      window.location.replace('/login');
       return;
     }
     
     const errorMessage = error instanceof Error ? error.message : defaultMessage;
     this.showCustomAlert(alertTitle, errorMessage);
+  }
+  
+  /**
+   * Check if error is session expired and redirect immediately if so
+   * Returns true if redirected, false otherwise
+   */
+  private checkAndRedirectIfSessionExpired(error: any): boolean {
+    if (this.isSessionExpiredError(error)) {
+      console.log('🔐 Session expired detected, redirecting to login immediately...');
+      authService.logout();
+      window.location.replace('/login');
+      return true;
+    }
+    return false;
   }
 
   private async loadData() {
@@ -900,6 +915,9 @@ selectedRoundDisplayName: '',
         loading: false
       });
     } catch (error) {
+      if (this.checkAndRedirectIfSessionExpired(error)) {
+        return; // Already redirected
+      }
       this.setState({
         error: error instanceof Error ? error.message : 'Failed to load data',
         loading: false
@@ -1267,16 +1285,8 @@ selectedRoundDisplayName: '',
     } catch (error) {
       console.error('❌ Error creating tournament:', error);
       this.setState({ loading: false });
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
-        return;
+      if (this.checkAndRedirectIfSessionExpired(error)) {
+        return; // Already redirected
       }
       const errorMessage = error instanceof Error ? error.message : 'Failed to create tournament';
       this.showCustomAlert('Error', `Failed to create tournament: ${errorMessage}`);
@@ -1740,16 +1750,8 @@ selectedRoundDisplayName: '',
       console.error('❌ Error moving players to round:', error);
       
       // Check if session expired - redirect to login instead of showing error
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
-        return;
+      if (this.checkAndRedirectIfSessionExpired(error)) {
+        return; // Already redirected
       }
       
       const errorMessage = error instanceof Error ? error.message : 'Failed to move players to round';
@@ -3104,70 +3106,208 @@ selectedRoundDisplayName: '',
         
         const usedRoundNames = Array.from(namesToHide);
 
-        const winnersToDisplay = roundsToUse
-  .flatMap(round =>
-    round.matches
-      .filter(match => match.status === 'completed' && match.winner)
-      .map(match => ({
-        player: { ...match.winner },
-        roundWon: round.displayName ?? round.name,
-        roundWonId: round.id,
-        matchId: match.id,
-        wonAt: match.endTime ? new Date(match.endTime) : new Date(),
-        // defaults for Set Winner Titles modal
-        rank: 1,
-        title: match.winner?.title || '', // Use title from winner if available
-        selected: true // Default to selected so they appear in Final Winners section
-      }))
-  )
-  // Also include winners from round.winners array (if they exist)
-  .concat(
-    roundsToUse.flatMap(round =>
-      (round.winners || [])
-        .filter(winner => winner && winner.id)
-        .map(winner => ({
-          player: { ...winner },
-          roundWon: round.displayName ?? round.name,
-          roundWonId: round.id,
-          matchId: '', // No specific match ID for winners from winners array
-          wonAt: new Date(), // Use current date as fallback
-          rank: 1,
-          title: winner.title || '', // Use title from winner if available
-          selected: true // Default to selected
-        }))
-    )
-  )
-  // keep only the most recent win per player
-  .reduce((acc, entry) => {
-    const idx = acc.findIndex(item => item.player.id === entry.player.id);
-    if (idx === -1 || ((entry.wonAt?.getTime() ?? 0) > (acc[idx].wonAt?.getTime() ?? 0))) {
-      if (idx === -1) acc.push(entry);
-      else acc[idx] = entry;
-    }
-    return acc;
-  }, [] as Array<{
-    player: Player;
-    roundWon: string;
-    roundWonId: string;
-    matchId: string;
-    wonAt: Date;
-    rank: number;
-    title: string;
-    selected: boolean;
-  }>)
-  // assign sequential ranks for display
-  .map((winner, index) => ({ ...winner, rank: index + 1 }));
+        // Simple approach: Get players from last 3 rounds
+        // Ensure roundsToUse is an array
+        if (!roundsToUse || !Array.isArray(roundsToUse)) {
+          console.error('❌ roundsToUse is not an array:', roundsToUse);
+          // Set empty array as fallback
+          const emptyWinnersToDisplay: Array<{
+            player: Player;
+            roundWon: string;
+            roundWonId: string;
+            matchId: string;
+            wonAt: Date;
+            rank: number;
+            title: string;
+            selected: boolean;
+          }> = [];
+          
+          this.setState({
+            currentGameMatch: {
+              ...tournamentData,
+              rounds: [],
+              currentRound: null
+            },
+            rounds: [],
+            winnersToDisplay: emptyWinnersToDisplay,
+            usedRoundNames: [],
+            activeRoundTab: null,
+            activeRoundSubTab: {},
+            showGameOrganization: true,
+            showTournamentModal: false,
+            selectedTournament: null,
+            loading: false
+          });
+          return;
+        }
+        
+        // Sort rounds by roundNumber (descending) to get the last rounds
+        const sortedRounds = [...roundsToUse].sort((a, b) => {
+          const aNum = a?.roundNumber || 0;
+          const bNum = b?.roundNumber || 0;
+          return bNum - aNum; // Descending order
+        });
+        
+        // Get last 3 rounds
+        const lastThreeRounds = sortedRounds.slice(0, 3);
+        
+        console.log('🏆 Last 3 Rounds:', lastThreeRounds.map(r => ({
+          name: r?.displayName || r?.name,
+          roundNumber: r?.roundNumber,
+          matches: r?.matches?.length || 0,
+          completedMatches: r?.matches?.filter(m => m?.status === 'completed').length || 0
+        })));
+        
+        // Collect all players from last 3 rounds (both winners and losers from completed matches)
+        const allPlayerEntries: Array<{
+          player: Player;
+          roundWon: string;
+          roundWonId: string;
+          matchId: string;
+          wonAt: Date;
+          rank: number;
+          title: string;
+          selected: boolean;
+          roundNumber: number;
+          isWinner: boolean;
+        }> = [];
+        
+        lastThreeRounds.forEach((round) => {
+          // Ensure round and matches exist
+          if (!round || !round.matches || !Array.isArray(round.matches)) {
+            console.warn('⚠️ Skipping round - missing matches:', round);
+            return;
+          }
+          
+          // Get winners and losers from completed matches
+          round.matches
+            .filter(match => match.status === 'completed')
+            .forEach(match => {
+              // Include winner
+              if (match.winner && match.winner.id !== BYE_PLAYER_ID && match.winner.id !== PLACEHOLDER_PLAYER_ID) {
+                allPlayerEntries.push({
+                  player: { ...match.winner },
+                  roundWon: round.displayName ?? round.name,
+                  roundWonId: round.id,
+                  matchId: match.id,
+                  wonAt: match.endTime ? new Date(match.endTime) : new Date(),
+                  rank: 1,
+                  title: (match.winner as any)?.title || '',
+                  selected: true,
+                  roundNumber: round.roundNumber || 0,
+                  isWinner: true
+                });
+              }
+              
+              // Include loser (if not BYE/TBD)
+              if (match.player1 && match.player2) {
+                const loser = match.winner && match.winner.id === match.player1.id ? match.player2 : match.player1;
+                if (loser && loser.id !== BYE_PLAYER_ID && loser.id !== PLACEHOLDER_PLAYER_ID &&
+                    loser.name !== 'TBD' && loser.name !== 'BYE' && 
+                    !loser.name?.toUpperCase().includes('TBD') &&
+                    !loser.name?.toUpperCase().includes('BYE')) {
+                  allPlayerEntries.push({
+                    player: { ...loser },
+                    roundWon: round.displayName ?? round.name,
+                    roundWonId: round.id,
+                    matchId: match.id,
+                    wonAt: match.endTime ? new Date(match.endTime) : new Date(),
+                    rank: 2,
+                    title: '',
+                    selected: true,
+                    roundNumber: round.roundNumber || 0,
+                    isWinner: false
+                  });
+                }
+              }
+            });
+          
+          // Also include winners from round.winners array
+          (round.winners || [])
+            .filter(winner => winner && winner.id && winner.id !== BYE_PLAYER_ID && winner.id !== PLACEHOLDER_PLAYER_ID)
+            .forEach(winner => {
+              // Only add if not already added from matches
+              const alreadyExists = allPlayerEntries.some(e => e.player.id === winner.id && e.roundWonId === round.id);
+              if (!alreadyExists) {
+                allPlayerEntries.push({
+                  player: { ...winner },
+                  roundWon: round.displayName ?? round.name,
+                  roundWonId: round.id,
+                  matchId: '',
+                  wonAt: new Date(),
+                  rank: 1,
+                  title: (winner as any).title || '',
+                  selected: true,
+                  roundNumber: round.roundNumber || 0,
+                  isWinner: true
+                });
+              }
+            });
+        });
+        
+        console.log('🏆 All Players from Last 3 Rounds:', {
+          total: allPlayerEntries.length,
+          byRound: lastThreeRounds.map(r => ({
+            round: r.displayName || r.name,
+            players: allPlayerEntries.filter(e => e.roundWonId === r.id).map(e => ({
+              name: e.player.name,
+              isWinner: e.isWinner
+            }))
+          }))
+        });
+        
+        // Remove duplicates - keep only the most recent entry per player
+        const uniquePlayers = allPlayerEntries.reduce((acc, entry) => {
+          const existingIndex = acc.findIndex(item => item.player.id === entry.player.id);
+          if (existingIndex === -1) {
+            acc.push(entry);
+          } else {
+            // If player exists, keep the one from the highest round
+            const existing = acc[existingIndex];
+            if (entry.roundNumber > existing.roundNumber) {
+              acc[existingIndex] = entry;
+            } else if (entry.roundNumber === existing.roundNumber && entry.isWinner && !existing.isWinner) {
+              // If same round, prefer winner over loser
+              acc[existingIndex] = entry;
+            }
+          }
+          return acc;
+        }, [] as typeof allPlayerEntries);
+        
+        // Sort by round number (descending), then by winner status (winner first), then by wonAt
+        const sortedPlayers = uniquePlayers.sort((a, b) => {
+          // Sort by round number (descending) - highest round first
+          if (a.roundNumber !== b.roundNumber) {
+            return b.roundNumber - a.roundNumber;
+          }
+          // Within same round, winner comes before loser
+          if (a.isWinner !== b.isWinner) {
+            return a.isWinner ? -1 : 1;
+          }
+          // Same status, sort by wonAt (most recent first)
+          return (b.wonAt?.getTime() ?? 0) - (a.wonAt?.getTime() ?? 0);
+        });
+        
+        // Assign proper ranks
+        const winnersToDisplay = sortedPlayers.map((player, index) => ({
+          player: player.player,
+          roundWon: player.roundWon,
+          roundWonId: player.roundWonId,
+          matchId: player.matchId,
+          wonAt: player.wonAt,
+          rank: index + 1, // 1st, 2nd, 3rd, etc.
+          title: player.title,
+          selected: player.selected
+        }));
   
-  console.log('🏆 Winners to Display:', {
-    total: winnersToDisplay.length,
-    selected: winnersToDisplay.filter(w => w.selected).length,
-    winners: winnersToDisplay.map(w => ({
-      name: w.player.name,
-      selected: w.selected,
-      title: w.title,
-      roundWon: w.roundWon
-    }))
-  });
+        console.log('🏆 Winners to Display (Last 3 Rounds):', {
+          total: winnersToDisplay.length,
+          winners: winnersToDisplay.map(w => ({
+            rank: w.rank,
+            name: w.player.name,
+            roundWon: w.roundWon
+          }))
+        });
 
   this.setState({
     currentGameMatch: {
@@ -3324,16 +3464,8 @@ selectedRoundDisplayName: '',
     } catch (error) {
       console.error('❌ Error deleting tournament:', error);
       this.setState({ loading: false });
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
-        return;
+      if (this.checkAndRedirectIfSessionExpired(error)) {
+        return; // Already redirected
       }
       const errorMessage = error instanceof Error ? error.message : 'Failed to delete tournament';
       this.showCustomAlert('Error', `Failed to delete tournament: ${errorMessage}`);
@@ -3970,16 +4102,8 @@ selectedRoundDisplayName: '',
     } catch (error) {
       console.error('❌ Error starting match:', error);
       this.setState({ loading: false });
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
-        return;
+      if (this.checkAndRedirectIfSessionExpired(error)) {
+        return; // Already redirected
       }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       this.showCustomAlert(
@@ -4166,15 +4290,42 @@ selectedRoundDisplayName: '',
         
         console.log(`✅ Cancelled match: ${matchId}. Players kept in unmatched section: ${playersToKeepInRound.map(p => this.getPlayerDisplayName(p)).join(', ')}`);
         
-        this.showCustomAlert(
-          giveByeTo
-            ? 'Player Advanced'
-            : 'Match Cancelled',
-          giveByeTo
-            ? `${advancedPlayer ? this.getPlayerDisplayName(advancedPlayer) : 'Selected player'} has been advanced to the next round.`
-            : 'Match has been cancelled successfully and players returned to the unmatched list.'
-        );
-        await this.refreshBracketData('cancel-match-success');
+        // If both players were removed (no giveByeTo), automatically advance matches that now have a BYE/TBD opponent
+        if (!giveByeTo) {
+          console.log('🔄 Both players removed - checking for automatic advancement opportunities...');
+          
+          // Refresh bracket data first to get updated state
+          await this.refreshBracketData('cancel-match-success');
+          
+          // Wait for state to update, then check for matches that need auto-advancement
+          console.log('🔄 Waiting for state update after bracket refresh...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Log current state for debugging
+          console.log('📊 Current rounds state:', this.state.rounds.map(r => ({
+            name: r.displayName || r.name,
+            matches: r.matches.map(m => ({
+              id: m.id,
+              player1: m.player1?.name,
+              player2: m.player2?.name,
+              status: m.status
+            }))
+          })));
+          
+          console.log('🔄 Starting auto-advancement check after cancel match...');
+          await this.autoAdvanceMatchesWithByeOpponent();
+          
+          this.showCustomAlert(
+            'Match Cancelled',
+            'Match has been cancelled. The system will automatically advance players with BYE opponents.'
+          );
+        } else {
+          this.showCustomAlert(
+            'Player Advanced',
+            `${advancedPlayer ? this.getPlayerDisplayName(advancedPlayer) : 'Selected player'} has been advanced to the next round.`
+          );
+          await this.refreshBracketData('cancel-match-success');
+        }
       } else {
         throw new Error(response.message || 'Failed to cancel match');
       }
@@ -4182,16 +4333,8 @@ selectedRoundDisplayName: '',
       console.error('❌ Error cancelling match:', error);
       this.setState({ loading: false });
       
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
-        return;
+      if (this.checkAndRedirectIfSessionExpired(error)) {
+        return; // Already redirected
       }
       
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -4253,6 +4396,216 @@ selectedRoundDisplayName: '',
         cancelMatchModalLoading: false,
         cancelMatchModalError: error instanceof Error ? error.message : 'Failed to cancel match. Please try again.'
       });
+    }
+  };
+
+  /**
+   * Automatically advance matches where one player has a BYE/TBD opponent
+   * This is called after canceling a match to handle automatic advancement
+   */
+  private autoAdvanceMatchesWithByeOpponent = async (): Promise<void> => {
+    try {
+      console.log('🔄 Auto-advancing matches with BYE/TBD opponents...');
+      
+      const matchesToAdvance: Array<{ matchId: string; player: Player; roundId: string }> = [];
+      
+      console.log('🔄 Checking rounds for auto-advancement:', this.state.rounds.length);
+      
+      // Find all matches that need auto-advancement
+      for (const round of this.state.rounds) {
+        console.log(`🔄 Checking round ${round.displayName || round.name} (${round.matches.length} matches)`);
+        for (const match of round.matches) {
+          // Skip if match is already completed
+          if (match.status === 'completed') {
+            continue;
+          }
+          
+          // Allow pending and active matches to be checked
+          // Especially important for matches waiting for opponents (TBD/placeholder)
+          
+          // Check if match has one real player and one BYE/TBD opponent
+          // This includes matches that are "awaiting opponent placement"
+          const player1 = match.player1;
+          const player2 = match.player2;
+          
+          // More robust check for TBD/BYE players - check ID, name, and name variations
+          const player1IsByeOrTbd = !player1 || 
+            player1.id === BYE_PLAYER_ID || 
+            player1.id === PLACEHOLDER_PLAYER_ID ||
+            (player1.name && (
+              player1.name.toUpperCase().includes('TBD') ||
+              player1.name.toUpperCase().includes('BYE') ||
+              player1.name === 'TBD' ||
+              player1.name === 'BYE' ||
+              player1.name === 'TBD PLAYER' ||
+              player1.name === 'BYE PLAYER'
+            ));
+            
+          const player2IsByeOrTbd = !player2 || 
+            player2.id === BYE_PLAYER_ID || 
+            player2.id === PLACEHOLDER_PLAYER_ID ||
+            (player2.name && (
+              player2.name.toUpperCase().includes('TBD') ||
+              player2.name.toUpperCase().includes('BYE') ||
+              player2.name === 'TBD' ||
+              player2.name === 'BYE' ||
+              player2.name === 'TBD PLAYER' ||
+              player2.name === 'BYE PLAYER'
+            ));
+          
+          // Debug logging
+          console.log(`🔍 Checking match ${match.id}:`, {
+            player1: player1 ? { id: player1.id, name: player1.name } : null,
+            player2: player2 ? { id: player2.id, name: player2.name } : null,
+            player1IsByeOrTbd,
+            player2IsByeOrTbd,
+            status: match.status
+          });
+          
+          // If one is real and one is BYE/TBD, we need to advance the real player
+          if (player1IsByeOrTbd && !player2IsByeOrTbd && player2) {
+            console.log(`✅ Found match ${match.id} to auto-advance: player2 (${this.getPlayerDisplayName(player2)}) vs BYE/TBD`);
+            matchesToAdvance.push({
+              matchId: match.id,
+              player: player2,
+              roundId: round.id
+            });
+          } else if (player2IsByeOrTbd && !player1IsByeOrTbd && player1) {
+            console.log(`✅ Found match ${match.id} to auto-advance: player1 (${this.getPlayerDisplayName(player1)}) vs BYE/TBD`);
+            matchesToAdvance.push({
+              matchId: match.id,
+              player: player1,
+              roundId: round.id
+            });
+          }
+        }
+      }
+      
+      if (matchesToAdvance.length === 0) {
+        console.log('✅ No matches found that need auto-advancement');
+        return;
+      }
+      
+      console.log(`🔄 Found ${matchesToAdvance.length} match(es) to auto-advance:`, matchesToAdvance.map(m => ({
+        matchId: m.matchId,
+        player: this.getPlayerDisplayName(m.player)
+      })));
+      
+      // Advance each match sequentially using completeMatch API
+      for (const { matchId, player, roundId } of matchesToAdvance) {
+        console.log(`🚀 Auto-advancing match ${matchId} with player ${this.getPlayerDisplayName(player)}...`);
+        try {
+          // Find the round and match details
+          const round = this.state.rounds.find(r => r.id === roundId);
+          if (!round) {
+            console.error(`❌ Round ${roundId} not found for match ${matchId}`);
+            continue;
+          }
+          
+          const match = round.matches.find(m => m.id === matchId);
+          if (!match) {
+            console.error(`❌ Match ${matchId} not found in round ${roundId}`);
+            continue;
+          }
+          
+          // Get tournament and round API IDs
+          const tournamentId = this.state.currentGameMatch?.tournamentId || this.state.selectedTournament?.id?.toString();
+          if (!tournamentId) {
+            console.error(`❌ Tournament ID not found`);
+            continue;
+          }
+          
+          const roundApiId = round.apiRoundId || round.id;
+          
+          // Extract match API ID - similar to cancelMatch logic
+          let matchApiId: string | undefined = match.apiMatchId;
+          if (!matchApiId && matchId) {
+            // Check if matchId is already a UUID
+            const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (uuidPattern.test(matchId)) {
+              matchApiId = matchId;
+            } else {
+              // Try to extract UUID from formats like "match_UUID_1"
+              const uuidMatch = matchId.match(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/i);
+              if (uuidMatch && uuidMatch[1]) {
+                matchApiId = uuidMatch[1];
+              }
+            }
+          }
+          
+          if (!matchApiId) {
+            console.error(`❌ Match API ID not found for match ${matchId}`);
+            continue;
+          }
+          
+          // Get player API ID (participant ID) - use the ID from the match, not the player object
+          // In bracket matches, use the participant ID directly from match
+          let playerApiId: string | null = null;
+          const isPlayer1 = match.player1?.id === player.id || match.player1?.customerProfileId === player.id;
+          
+          if (isPlayer1) {
+            // Use participant ID from match.player1
+            playerApiId = match.player1?.id || match.player1?.customerProfileId || player.id || player.customerProfileId || null;
+          } else {
+            // Use participant ID from match.player2
+            playerApiId = match.player2?.id || match.player2?.customerProfileId || player.id || player.customerProfileId || null;
+          }
+          
+          if (!playerApiId) {
+            console.error(`❌ Player API ID not found for ${this.getPlayerDisplayName(player)}`);
+            continue;
+          }
+          
+          // Determine score based on player position
+          const scorePlayer1 = isPlayer1 ? 1 : 0;
+          const scorePlayer2 = isPlayer1 ? 0 : 1;
+          
+          // Complete the match via API (BYE win = 1-0)
+          console.log(`🏁 Completing match via API:`, {
+            tournamentId,
+            roundId: roundApiId,
+            matchId: matchApiId,
+            winnerId: playerApiId,
+            scorePlayer1,
+            scorePlayer2
+          });
+          
+          try {
+            const completeResponse = await matchesApiService.completeMatch(
+              tournamentId,
+              roundApiId,
+              matchApiId,
+              playerApiId,
+              scorePlayer1,
+              scorePlayer2
+            );
+            
+            if (completeResponse.success) {
+              console.log(`✅ Successfully auto-advanced match ${matchId}`);
+            } else {
+              console.error(`❌ Auto-advancement failed for match ${matchId}:`, completeResponse.message);
+              throw new Error(completeResponse.message || 'Failed to complete match');
+            }
+          } catch (apiError) {
+            console.error(`❌ API error auto-advancing match ${matchId}:`, apiError);
+            throw apiError; // Re-throw to be caught by outer try-catch
+          }
+          
+          // Wait a bit between advances to allow state to update
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error(`❌ Error auto-advancing match ${matchId}:`, error);
+          // Continue with other matches even if one fails
+        }
+      }
+      
+      console.log('✅ Auto-advancement complete');
+      
+      // Refresh bracket data one final time
+      await this.refreshBracketData('auto-advancement-complete');
+    } catch (error) {
+      console.error('❌ Error in autoAdvanceMatchesWithByeOpponent:', error);
+      // Don't show error to user, just log it
     }
   };
 
@@ -4628,16 +4981,8 @@ selectedRoundDisplayName: '',
     } catch (error) {
       console.error('❌ Error completing match:', error);
       this.setState({ loading: false });
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
-        return;
+      if (this.checkAndRedirectIfSessionExpired(error)) {
+        return; // Already redirected
       }
       const errorMessage = error instanceof Error ? error.message : 'Failed to complete match';
       this.showCustomAlert(
@@ -4983,8 +5328,13 @@ selectedRoundDisplayName: '',
       console.log('🏆 Calling saveWinnerTitles API');
       const response = await matchesApiService.saveWinnerTitles(tournamentId, selectedWinners);
       
-      if (response.success) {
-        console.log('✅ Winner titles saved via API:', response.data);
+      // API may return data directly or wrapped in { success: true, data: ... }
+      // If no error is thrown, consider it successful
+      console.log('✅ Winner titles saved via API:', response);
+      
+      // Handle both response formats
+      const responseData = response?.data || response;
+      const savedWinners = responseData?.winners || responseData || selectedWinners;
 
         // Update winnersToDisplay with the new titles and rankings from rankedWinners
         // Preserve all existing properties and update with new titles/ranks
@@ -4998,6 +5348,8 @@ selectedRoundDisplayName: '',
             title: rankedWinner.title || originalWinner?.title || '', // Use updated title from rankedWinners
             roundWon: rankedWinner.roundWon || originalWinner?.roundWon || '',
             roundWonId: originalWinner?.roundWonId || '',
+            matchId: originalWinner?.matchId || '',
+            wonAt: originalWinner?.wonAt || new Date(),
             selected: rankedWinner.selected !== false // Preserve selection state
           };
         });
@@ -5006,45 +5358,56 @@ selectedRoundDisplayName: '',
           before: this.state.winnersToDisplay.length,
           after: updatedWinnersToDisplay.length,
           titles: updatedWinnersToDisplay.map(w => ({ name: w.player.name, title: w.title, rank: w.rank, selected: w.selected }))
-    });
+        });
 
-    this.setState({ 
-      winnersToDisplay: updatedWinnersToDisplay,
+        // Prepare success message
+        const finalSkippedCount = totalSelected - selectedWinners.length;
+        const savedCount = savedWinners?.length || selectedWinners.length;
+        const successMessage = finalSkippedCount > 0
+          ? `Successfully saved ${savedCount} winner title(s)!\n\nNote: ${finalSkippedCount} winner(s) were skipped due to invalid or missing customer IDs.`
+          : `Successfully saved ${savedCount} winner title(s)!`;
+
+        // Close modal and update state
+        this.setState({ 
+          winnersToDisplay: updatedWinnersToDisplay,
           showSetWinnerTitles: false,
           loading: false
         }, () => {
-          console.log('✅ State updated. New winnersToDisplay:', this.state.winnersToDisplay.length);
+          console.log('✅ State updated. Modal closed. New winnersToDisplay:', this.state.winnersToDisplay.length);
           console.log('✅ Winners with titles:', this.state.winnersToDisplay.map(w => ({ 
             name: w.player.name, 
             title: w.title, 
             rank: w.rank,
             selected: w.selected 
           })));
-    });
-
-    // Show success message
-        const finalSkippedCount = totalSelected - selectedWinners.length;
-        const successMessage = finalSkippedCount > 0
-          ? `Successfully saved ${response.data?.winners?.length || selectedWinners.length} winner title(s)!\n\nNote: ${finalSkippedCount} winner(s) were skipped due to invalid or missing customer IDs.`
-          : `Successfully saved ${response.data?.winners?.length || selectedWinners.length} winner title(s)!`;
-        
-        this.showCustomAlert('Winner Titles Saved', successMessage);
-      } else {
-        console.error('❌ API returned success: false', response);
-        throw new Error(response.message || 'Failed to save winner titles');
-      }
+          
+          // Show success message after modal is closed
+          this.showCustomAlert('Winner Titles Saved', successMessage);
+        });
     } catch (error) {
       console.error('❌ Error saving winner titles:', error);
       console.error('❌ Error details:', {
         message: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined
       });
+      
+      // Check for session expiration and redirect
+      if (this.checkAndRedirectIfSessionExpired(error)) {
+        return; // Already redirected
+      }
+      
       const errorMessage = error instanceof Error ? error.message : 'Failed to save winner titles';
-      this.setState({ loading: false });
-    this.showCustomAlert(
+      
+      // Close modal and show error
+      this.setState({ 
+        loading: false,
+        showSetWinnerTitles: false // Close modal even on error
+      });
+      
+      this.showCustomAlert(
         'Error Saving Winner Titles',
         `Failed to save winner titles: ${errorMessage}\n\nPlease check the console for more details.`
-    );
+      );
     }
   };
 
@@ -5921,16 +6284,8 @@ selectedRoundDisplayName: '',
       this.setState({ loading: false });
       
       // Check if session expired - redirect to login instead of showing error
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
-        return;
+      if (this.checkAndRedirectIfSessionExpired(error)) {
+        return; // Already redirected
       }
       
       const errorMessage = error instanceof Error ? error.message : 'Failed to shuffle round';
@@ -6772,7 +7127,9 @@ selectedRoundDisplayName: '',
       const response = await matchesApiService.getBracket(tournamentId);
 
       if (response.success && response.data) {
-        const { tournament, rounds } = response.data;
+        // Safely destructure - handle undefined
+        const tournament = response.data.tournament || response.data;
+        const rounds = response.data.rounds;
 
         // Check if tournament uses bracket system (handle both camelCase and snake_case)
         const bracketType = tournament?.bracketType || tournament?.bracket_type;
@@ -6788,10 +7145,34 @@ selectedRoundDisplayName: '',
 
           // Convert API rounds to TournamentRound format
           // Handle both direct rounds array and nested rounds array
-          const apiRounds = Array.isArray(rounds) ? rounds : (response.data.rounds || []);
+          // Safely get rounds - check multiple possible locations
+          let apiRounds: any[] = [];
+          if (Array.isArray(rounds)) {
+            apiRounds = rounds;
+          } else if (response.data.rounds && Array.isArray(response.data.rounds)) {
+            apiRounds = response.data.rounds;
+          } else {
+            console.warn('⚠️ No rounds found in response.data:', response.data);
+            apiRounds = [];
+          }
           const bracketPlayerIds = new Set<string>();
 
-          const convertedRounds: TournamentRound[] = apiRounds.map((round: any) => {
+          // Ensure apiRounds is an array before mapping
+          if (!Array.isArray(apiRounds)) {
+            console.error('❌ apiRounds is not an array:', apiRounds);
+            apiRounds = [];
+          }
+          
+          const convertedRounds: TournamentRound[] = apiRounds
+            .filter((round: any) => {
+              // Filter out invalid rounds before mapping
+              if (!round) {
+                console.warn('⚠️ Skipping invalid round:', round);
+                return false;
+              }
+              return true;
+            })
+            .map((round: any) => {
             // Handle both snake_case and camelCase field names
             const roundId = round.id || round.roundId;
             const roundName = round.roundName || round.name || `Round ${round.roundNumber || round.round_number || 1}`;
@@ -6926,7 +7307,13 @@ selectedRoundDisplayName: '',
             };
           });
 
-          const firstRoundId = convertedRounds.length > 0 ? convertedRounds[0].id : null;
+          // Ensure we have valid rounds
+          if (!Array.isArray(convertedRounds)) {
+            console.error('❌ convertedRounds is not an array:', convertedRounds);
+            return;
+          }
+
+          const firstRoundId = convertedRounds.length > 0 ? convertedRounds[0]?.id : null;
 
           // Update rounds in state and activate the first round/tab by default
           this.setState(prevState => ({
@@ -6956,10 +7343,19 @@ selectedRoundDisplayName: '',
           }));
 
           console.log('✅ Bracket loaded successfully:', convertedRounds.length, 'rounds');
+          
+          // After bracket is loaded, check for matches that need auto-advancement
+          // Wait a bit for state to update, then check
+          setTimeout(async () => {
+            await this.autoAdvanceMatchesWithByeOpponent();
+          }, 800);
         }
       }
     } catch (error) {
       console.error('❌ Error loading bracket:', error);
+      if (this.checkAndRedirectIfSessionExpired(error)) {
+        return; // Already redirected
+      }
       this.addAppNotification(
         error instanceof Error ? error.message : 'Failed to load bracket',
         'error'
@@ -6995,6 +7391,9 @@ selectedRoundDisplayName: '',
       }
     } catch (error) {
       console.error('❌ Error getting bracket status:', error);
+      if (this.checkAndRedirectIfSessionExpired(error)) {
+        return; // Already redirected
+      }
     }
   };
 
@@ -7403,16 +7802,8 @@ selectedRoundDisplayName: '',
       console.error('❌ Error creating round:', error);
       
       // Check if session expired - redirect to login instead of showing error
-      if (this.isSessionExpiredError(error)) {
-        console.log('🔐 Session expired, redirecting to login...');
-        authService.logout();
-        // Use replace instead of href to prevent back button navigation
-        setTimeout(() => {
-          if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-            window.location.replace('/login');
-          }
-        }, 0);
-        return;
+      if (this.checkAndRedirectIfSessionExpired(error)) {
+        return; // Already redirected
       }
       
       const errorMessage = error instanceof Error ? error.message : 'Failed to create round';
@@ -8911,8 +9302,23 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                         </div>
                       )}
 
-                      {/* Set Winner Titles Button - Show when at least one round has winners */}
-                      {this.state.rounds.some(r => r.winners && r.winners.length > 0) && (
+                      {/* Set Winner Titles Button - Show when there are rounds with winners, completed matches, or winnersToDisplay */}
+                      {(() => {
+                        // Check if there are any winners in rounds array
+                        const hasWinnersInRounds = this.state.rounds.some(r => r.winners && r.winners.length > 0);
+                        // Check if there are winners in winnersToDisplay
+                        const hasWinnersToDisplay = this.state.winnersToDisplay && this.state.winnersToDisplay.length > 0;
+                        // Check if there are completed matches with winners (for bracket mode)
+                        const hasCompletedMatchesWithWinners = this.state.rounds.some(r => 
+                          r.matches && r.matches.some(m => m.status === 'completed' && m.winner)
+                        );
+                        // Check if there are any completed matches at all (winners might be in match.winner)
+                        const hasAnyCompletedMatches = this.state.rounds.some(r => 
+                          r.matches && r.matches.some(m => m.status === 'completed')
+                        );
+                        
+                        return hasWinnersInRounds || hasWinnersToDisplay || hasCompletedMatchesWithWinners || hasAnyCompletedMatches;
+                      })() && (
                         <button
                           onClick={this.showSetWinnerTitles}
                           className="w-full mb-3 bg-purple-600 text-white px-4 py-3 rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center justify-center gap-2"
@@ -11741,7 +12147,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                               value={rankedWinner.title}
                               onChange={(e) => this.updateWinnerTitle(index, e.target.value)}
                               placeholder="Enter custom title..."
-                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900 bg-white"
                             />
                           </div>
                         </div>
@@ -11754,7 +12160,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                           <select
                             value={index + 1}
                             onChange={(e) => this.updateWinnerRank(index, parseInt(e.target.value))}
-                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-gray-900"
                           >
                             {this.state.rankedWinners.map((_, idx) => (
                               <option key={idx + 1} value={idx + 1}>
@@ -11796,12 +12202,27 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
             console.log('🎯 Save Winner Titles button clicked');
             this.saveWinnerTitles();
           }}
-          className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2"
+          disabled={this.state.loading}
+          className={`px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors font-medium flex items-center gap-2 ${
+            this.state.loading ? 'opacity-50 cursor-not-allowed' : ''
+          }`}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-          Save Winner Titles
+          {this.state.loading ? (
+            <>
+              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Saving...
+            </>
+          ) : (
+            <>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+              Save Winner Titles
+            </>
+          )}
         </button>
       </div>
     </div>
@@ -12207,14 +12628,14 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
           return (
           <div key={round.id} className="flex flex-col flex-shrink-0 min-w-[340px]">
            {/* Round Group Header */}
-<div className="text-sm text-gray-600 font-medium mb-1 text-center flex items-center justify-center gap-2">
+<div className="text-xl text-yellow-700 font-bold mb-2 text-center flex items-center justify-center gap-3">
   {this.state.editingRoundId === round.id ? (
     <div className="flex items-center space-x-1">
       <input
         type="text"
         value={this.state.editingRoundName}
         onChange={(e) => this.setState({ editingRoundName: e.target.value })}
-        className="text-xs font-medium bg-transparent border-b border-gray-400 focus:outline-none focus:border-blue-500 text-center"
+        className="text-lg font-bold bg-transparent border-b-2 border-yellow-600 focus:outline-none focus:border-yellow-500 text-center text-yellow-700"
         autoFocus
         onKeyDown={(e) => {
           if (e.key === 'Enter') this.saveRoundName(round.id);
@@ -12223,23 +12644,23 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
       />
       <button
         onClick={() => this.saveRoundName(round.id)}
-        className="text-green-600 hover:text-green-800 text-xs"
+        className="text-green-600 hover:text-green-800 text-base"
       >
         ✓
       </button>
       <button
         onClick={this.cancelEditingRoundName}
-        className="text-red-600 hover:text-red-800 text-xs"
+        className="text-red-600 hover:text-red-800 text-base"
       >
         ✗
       </button>
     </div>
   ) : (
-    <div className="flex items-center space-x-1">
-      <span>{round.displayName || round.name}</span>
+    <div className="flex items-center space-x-2">
+      <span className="text-xl font-bold text-yellow-700">{round.displayName || round.name}</span>
       <button
         onClick={() => this.startEditingRoundName(round.id)}
-        className="text-gray-400 hover:text-blue-600 transition-colors"
+        className="text-yellow-600 hover:text-yellow-800 transition-colors text-base"
         title="Edit round name"
       >
         ✏️
@@ -12274,7 +12695,13 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
           >
             <Users className="w-5 h-5 mr-2" />
             Players
-            <span className="ml-3 px-3 py-1 bg-white bg-opacity-20 text-white rounded-full text-sm font-semibold">
+            <span className={`ml-3 px-3 py-1 rounded-full text-sm font-semibold ${
+              this.state.activeRoundTab === round.id && 
+              this.state.activeRoundSubTab[round.id] !== 'winners' && 
+              this.state.activeRoundSubTab[round.id] !== 'losers'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-200 text-gray-800'
+            }`}>
               {roundPlayerCount}
             </span>
           </button>
@@ -12297,7 +12724,12 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
   >
     <Trophy className="w-4 h-4 mr-2" />
     Winners
-    <span className="ml-2 px-2 py-1 bg-white bg-opacity-20 text-white rounded-full text-xs">
+    <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+      this.state.activeRoundTab === round.id && 
+      this.state.activeRoundSubTab[round.id] === 'winners'
+        ? 'bg-green-600 text-white'
+        : 'bg-gray-200 text-gray-800'
+    }`}>
       {round.winners.length}
     </span>
   </button>
@@ -12321,7 +12753,12 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
     
     
     Losers
-    <span className="ml-2 px-2 py-1 bg-white bg-opacity-20 text-white rounded-full text-xs">
+    <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+      this.state.activeRoundTab === round.id && 
+      this.state.activeRoundSubTab[round.id] === 'losers'
+        ? 'bg-red-600 text-white'
+        : 'bg-gray-200 text-gray-800'
+    }`}>
       {round.losers?.length || 0}
     </span>
   </button>
@@ -13139,7 +13576,7 @@ private moveSelectedLosersToDestination = (sourceRoundId: string): void => {
                   
                   {match.status === 'pending' && awaitingOpponent && (
                     <div className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg text-sm font-medium">
-                      Waiting for previous match winner…
+                      Waiting for previous match winner… (Auto-advancing if BYE opponent)
                     </div>
                   )}
                   

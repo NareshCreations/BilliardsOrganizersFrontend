@@ -31,6 +31,7 @@ const OrganizerDashboard: React.FC<DashboardProps> = (props) => {
   const { logout } = useAuth();
 
   const [activeSection, setActiveSection] = useState<'dashboard' | 'tournaments' | 'players' | 'live-games'>('dashboard');
+  const [showTournamentSubmenu, setShowTournamentSubmenu] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [notifications, setNotifications] = useState<Array<{
@@ -103,14 +104,21 @@ const OrganizerDashboard: React.FC<DashboardProps> = (props) => {
    * Handle section navigation
    */
   const handleSectionChange = (section: 'dashboard' | 'tournaments' | 'players' | 'live-games') => {
-    // If tournaments is clicked, navigate to /tournaments route instead of changing section
-    if (section === 'tournaments') {
-      console.log('Navigating to /tournaments route');
-      navigate('/tournaments');
-      return;
-    }
     setActiveSection(section);
     console.log('Section changed', { section });
+  };
+
+  /**
+   * Handle tournament page navigation
+   */
+  const handleTournamentPageNavigation = (page: 'normal' | 'bracket') => {
+    if (page === 'normal') {
+      console.log('Navigating to normal tournament page (/tournaments)');
+      navigate('/tournaments');
+    } else {
+      console.log('Navigating to tournament bracket page (/tournament-bracket)');
+      navigate('/tournament-bracket');
+    }
   };
 
   /**
@@ -146,16 +154,60 @@ const OrganizerDashboard: React.FC<DashboardProps> = (props) => {
 
         <ul className={styles.navigationList}>
           {navigationItems.map((item) => (
-            <li key={item.id} className={styles.navigationItem}>
+            <li 
+              key={item.id} 
+              className={styles.navigationItem}
+              onMouseEnter={() => {
+                if (item.id === 'tournaments') {
+                  setShowTournamentSubmenu(true);
+                }
+              }}
+              onMouseLeave={() => {
+                if (item.id === 'tournaments') {
+                  setShowTournamentSubmenu(false);
+                }
+              }}
+            >
               <button
                 className={`${styles.navigationButton} ${
                   activeSection === item.id ? styles.active : ''
                 }`}
-                onClick={() => handleSectionChange(item.id)}
+                onClick={() => {
+                  if (item.id === 'tournaments') {
+                    setShowTournamentSubmenu(!showTournamentSubmenu);
+                  } else {
+                    handleSectionChange(item.id);
+                  }
+                }}
               >
                 <span className={styles.navigationIcon}>{item.icon}</span>
                 <span className={styles.navigationLabel}>{item.label}</span>
+                {item.id === 'tournaments' && (
+                  <span className={styles.submenuArrow}>{showTournamentSubmenu ? '▼' : '▶'}</span>
+                )}
               </button>
+              {item.id === 'tournaments' && showTournamentSubmenu && (
+                <ul className={styles.submenu}>
+                  <li className={styles.submenuItem}>
+                    <button
+                      className={styles.submenuButton}
+                      onClick={() => handleTournamentPageNavigation('normal')}
+                    >
+                      <span className={styles.submenuIcon}>📋</span>
+                      <span className={styles.submenuLabel}>Normal Tournament</span>
+                    </button>
+                  </li>
+                  <li className={styles.submenuItem}>
+                    <button
+                      className={styles.submenuButton}
+                      onClick={() => handleTournamentPageNavigation('bracket')}
+                    >
+                      <span className={styles.submenuIcon}>🏆</span>
+                      <span className={styles.submenuLabel}>Tournament Bracket</span>
+                    </button>
+                  </li>
+                </ul>
+              )}
             </li>
           ))}
         </ul>
